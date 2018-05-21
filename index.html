@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <title>Turbine Time Series</title>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+            integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+            crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"
+            integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49"
+            crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"
+            integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T"
+            crossorigin="anonymous"></script>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="http://underscorejs.org/underscore-min.js"></script>
+    <script src="https://momentjs.com/downloads/moment.min.js"></script>
+    <script src="https://d3js.org/d3-hexbin.v0.2.min.js"></script>
+    <script type="application/javascript" src="app.js"></script>
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css"
+          integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
+    <link rel="stylesheet" href="app.css"/>
+</head>
+<body class="container-fluid">
+<header class="text-center">
+    <h1>Turbine Tranny 'tector</h1>
+</header>
+<div class="row">
+    <div class="col text-center">
+        <div class="btn-group">
+            <div id="psn-selector">
+                <button
+                        class="btn btn-secondary dropdown-toggle"
+                        type="button"
+                        data-toggle="dropdown"
+                        aria-haspopup="true"
+                        aria-expanded="false">
+                    Select a PSN
+                </button>
+                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                </div>
+                S
+            </div>
+            <div id="metric-selector">
+                <button
+                        class="btn btn-secondary dropdown-toggle"
+                        type="button"
+                        data-toggle="dropdown"
+                        aria-haspopup="true"
+                        aria-expanded="false">
+                    Select a Metric
+                </button>
+                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-6">
+
+        <div class="row">
+            <div id="stats" class="col">
+                <h2>Package Stats</h2>
+            </div>
+        </div>
+        <div class="row">
+            <div id="reduced-space" class="col">
+                <h2>Performance Space</h2>
+                <svg class="scatter"></svg>
+            </div>
+        </div>
+    </div>
+    <div id="timeseries" class="col-md-6">
+        <div class="row">
+            <div id="timeseries-back" class="col-md-1">
+
+            </div>
+            <div id="timeseries-plots" class="col-md-10">
+                <div id="timeseries-plots-eigen"></div>
+                <div id="timeseries-plots-raw"></div>
+            </div>
+            <div id="timeseries-forward" class="col-md-1">
+
+            </div>
+        </div>
+    </div>
+</div>
+<script type="application/javascript">
+    d3.queue()
+        .defer(d3.csv, "data/model2_psn.csv")
+        .defer(d3.csv, "data/model2_fields.csv")
+        .defer(d3.csv, "data/metrics.csv")
+        .await(init);
+
+    function init(error, psn, fields, metrics, pca, raw) {
+        if (error) {
+            console.log(error);
+        }
+
+        var w = Math.max(document.documentElement.clientWidth, window.innerWidth || 0) - 30;
+        var h = Math.max(document.documentElement.clientHeight, window.innerHeight || 0) - 30;
+        var dashboard = trannyTector.director()
+            .dimensions({width: w, height: h});
+
+        d3.select("body")
+            .datum({psn: psn, fields: fields, metrics: metrics})
+            .call(dashboard);
+    }
+</script>
+</body>
+</html>
