@@ -3,10 +3,10 @@ d3
 _
 */
 
-var trannyTector = {};
+var transientTector = {};
 
-trannyTector.timeParse = d3.timeParse("%Y-%m-%d %H:%M:%S.%f");
-trannyTector.timeShiftButton = function (directorEvents) {
+transientTector.timeParse = d3.timeParse("%Y-%m-%d %H:%M:%S.%f");
+transientTector.timeShiftButton = function (directorEvents) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
@@ -36,7 +36,7 @@ trannyTector.timeShiftButton = function (directorEvents) {
     };
     return constructor;
 };
-trannyTector.timeZoomInButton = function (directorEvents) {
+transientTector.timeZoomInButton = function (directorEvents) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
@@ -66,7 +66,7 @@ trannyTector.timeZoomInButton = function (directorEvents) {
     };
     return constructor;
 };
-trannyTector.timeZoomOutButton = function (directorEvents) {
+transientTector.timeZoomOutButton = function (directorEvents) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
@@ -96,7 +96,7 @@ trannyTector.timeZoomOutButton = function (directorEvents) {
     };
     return constructor;
 };
-trannyTector.timePlot = function (directorEvents, dataKey) {
+transientTector.timePlot = function (directorEvents, dataKey) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
@@ -187,15 +187,15 @@ trannyTector.timePlot = function (directorEvents, dataKey) {
     };
     return constructor;
 };
-trannyTector.timeSeries = function (directorEvents) {
+transientTector.timeSeries = function (directorEvents) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
     var data;
     var fieldOptions = [];
     var rawPlots = {
-        "perf_pow": trannyTector.timePlot(directorEvents, "perf_pow"),
-        "t5_5": trannyTector.timePlot(directorEvents, "t5_5")
+        "perf_pow": transientTector.timePlot(directorEvents, "perf_pow"),
+        "t5_5": transientTector.timePlot(directorEvents, "t5_5")
     };
     var eigenPlots = [];
 
@@ -250,7 +250,7 @@ trannyTector.timeSeries = function (directorEvents) {
 
     return constructor;
 };
-trannyTector.reducedZoomInButton = function (directorEvents) {
+transientTector.reducedZoomInButton = function (directorEvents) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
@@ -280,7 +280,7 @@ trannyTector.reducedZoomInButton = function (directorEvents) {
     };
     return constructor;
 };
-trannyTector.reducedZoomOutButton = function (directorEvents) {
+transientTector.reducedZoomOutButton = function (directorEvents) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
@@ -310,7 +310,7 @@ trannyTector.reducedZoomOutButton = function (directorEvents) {
     };
     return constructor;
 };
-trannyTector.reducedSpace = function (directorEvents) {
+transientTector.reducedSpace = function (directorEvents) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
@@ -405,7 +405,7 @@ trannyTector.reducedSpace = function (directorEvents) {
     return constructor;
 };
 
-trannyTector.stats = function (directorEvents) {
+transientTector.stats = function (directorEvents) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
@@ -436,7 +436,7 @@ trannyTector.stats = function (directorEvents) {
     return constructor;
 };
 
-trannyTector.psnSelector = function (directorEvents) {
+transientTector.psnSelector = function (directorEvents) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
@@ -488,7 +488,7 @@ trannyTector.psnSelector = function (directorEvents) {
     };
     return constructor;
 };
-trannyTector.metricSelector = function (directorEvents) {
+transientTector.metricSelector = function (directorEvents) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
@@ -542,7 +542,7 @@ trannyTector.metricSelector = function (directorEvents) {
     return constructor;
 };
 
-trannyTector.director = function () {
+transientTector.director = function () {
     "use strict";
     var container;
     var data;
@@ -571,13 +571,13 @@ trannyTector.director = function () {
         data.raw = raw;
         data.pca = pca;
         data.raw.forEach(function (d) {
-            d.timestamp = trannyTector.timeParse(d.timestamp);
+            d.timestamp = transientTector.timeParse(d.timestamp);
             for (var i in data.fields) {
                 d[data.fields[i].field] = +d[data.fields[i].field];
             }
         });
         data.pca.forEach(function (d) {
-            d.timestamp = trannyTector.timeParse(d.timestamp);
+            d.timestamp = transientTector.timeParse(d.timestamp);
         });
         draw();
     }
