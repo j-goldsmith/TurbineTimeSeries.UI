@@ -97,7 +97,7 @@
         .defer(d3.csv, "data/metrics.csv")
         .await(init);
 
-    function init(error, psn, fields, metrics, pca, raw) {
+    function init(error, psn, fields, metrics) {
         if (error) {
             console.log(error);
         }

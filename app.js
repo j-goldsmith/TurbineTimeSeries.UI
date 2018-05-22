@@ -105,18 +105,79 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         x: d3.scaleTime(),
         y: d3.scaleLinear()
     };
+    var selectedIndices = [];
+    var dragStartX, dragEndX;
 
     function hover(hoveredCoordinate) {
         container.select("line.hover")
             .attr("x1", hoveredCoordinate)
-            .attr("y1", dimensions.height * 0.2)
+            .attr("y1", 0)
             .attr("x2", hoveredCoordinate)
-            .attr("y2", dimensions.height);
+            .attr("y2", dimensions.height * 0.8);
+    }
+
+    function dragStart() {
+        selectedIndices = [];
+        dragStartX = d3.event.x;
+        dragEndX = d3.event.x;
+    }
+
+    function dragging() {
+        var current = d3.event.x;
+        if (dragStartX > current) {
+            dragStartX = current
+        }
+        else if (current > dragEndX) {
+            dragEndX = current
+        }
+        else if (current < dragEndX) {
+            dragStartX = current
+        }
+
+        container.select('rect.selected-range')
+            .attr('width', dragEndX - dragStartX)
+            .attr('height', dimensions.height)
+            .attr('fill', 'lightgrey')
+            .attr('fill-opacity', .6)
+            .attr('x', dragStartX)
+            .attr('y', 0);
+    }
+
+    function dragEnd() {
+        selectedIndices = [];
+        var plotSpacing = (dimensions.width) / data.length;
+
+        var current = d3.event.x;
+        if (dragStartX > current) {
+            dragStartX = current
+        }
+        else if (current > dragEndX) {
+            dragEndX = current
+        }
+        else if (current < dragEndX) {
+            dragStartX = current
+        }
+
+        container.select('rect.selected-range')
+            .attr('width', dragEndX - dragStartX)
+            .attr('height', dimensions.height * 0.8)
+            .attr('fill', 'lightgrey')
+            .attr('fill-opacity', .6)
+            .attr('x', dragStartX)
+            .attr('y', 0);
+
+        var startI = scales.x.invert(dragStartX);
+        var endI = scales.x.invert(dragEndX);
+
+        selectedIndices = _.filter(data, function (d) {
+            return d.timestamp >= startI && d.timestamp <= endI;
+        });
+
+        //draw();
+        //onUpdateHovered();
     }
 
     function draw() {
-        container.attr("width", dimensions.width);
-        container.attr("height", dimensions.height);
         var yExtent = d3.extent(data, function (d) {
             return d[dataKey];
         });
@@ -124,7 +185,7 @@ transientTector.timePlot = function (directorEvents, dataKey) {
             return d.timestamp;
         });
         scales.x.range([(dimensions.width * 0.05), dimensions.width]);
-        scales.y.range([dimensions.height, (dimensions.height * 0.2)]);
+        scales.y.range([dimensions.height * 0.8, 0]);
         scales.x.domain(xExtent);
         scales.y.domain(yExtent);
 
@@ -136,37 +197,77 @@ transientTector.timePlot = function (directorEvents, dataKey) {
                 return scales.y(d[dataKey]);
             });
 
-        container.selectAll("g").remove();
-        container.selectAll("path").remove();
-        container.selectAll("line").remove();
-        container.append("path")
+
+        var drag_behavior = d3.drag()
+            .on("start", dragStart)
+            .on("drag", dragging)
+            .on("end", dragEnd);
+
+        container.select("svg").select('rect.timeline-hover')
+            .attr('width', dimensions.width)
+            .attr('height', dimensions.height * 0.8)
+            .call(drag_behavior);
+
+        container.select("svg")
+            .attr("width", dimensions.width)
+            .attr("height", dimensions.height * 0.8);
+
+        container.select("h4")
+            .text(dataKey);
+
+        container.select("svg").select("path.plot-line")
             .data([data])
-            .attr("class", "line")
-            .attr("stroke", "lightgrey")
-            .attr("stroke-width", ".3")
-            .attr("fill", "none")
             .attr("d", plotLine);
 
         // Add the X Axis
-        container.append("g")
+        container.select("g.xaxis")
             .attr("transform", "translate(0," + (dimensions.height) + ")")
             .call(d3.axisBottom(scales.x));
 
         // Add the Y Axis
-        container.append("g")
+        container.select("g.yaxis")
             .attr("transform", "translate(" + (dimensions.width * 0.05) + ",0)")
-            .attr("stroke", "lightgrey")
-            .attr("stroke-width", ".3")
-            .attr("fill", "none")
             .call(d3.axisLeft(scales.y));
 
-        container.append("line").attr("class", "hover").attr("stroke", "red");
+
     }
 
     function constructor(selection) {
         selection.each(function (d) {
             container = d3.select(this);
             data = d;
+
+            container.selectAll("svg").remove();
+            container.selectAll("div").remove();
+
+            container.append("div")
+                .attr("class", "plot-title")
+                .append("h4");
+
+            var svg = container.append("svg");
+            svg.append('rect')
+                .attr("class", "selected-range");
+            svg.append('g')
+                .attr("class", "xaxis");
+
+            svg.append('g')
+                .attr("class", "yaxis")
+                .attr("stroke", "lightgrey")
+                .attr("stroke-width", ".3")
+                .attr("fill", "none");
+
+            svg.append("path")
+                .attr("class", "plot-line")
+                .attr("stroke", "lightgrey")
+                .attr("stroke-width", ".3")
+                .attr("fill", "none");
+
+            svg.append("line").attr("class", "hover").attr("stroke", "red");
+            svg.append('rect')
+                .attr("class", "timeline-hover")
+                .attr('fill-opacity', 0)
+                .attr('stroke-opacity', 0);
+
             draw();
         });
     }
@@ -211,18 +312,18 @@ transientTector.timeSeries = function (directorEvents) {
             return;
         }
         var raw = container.select("#timeseries-plots-raw")
-            .selectAll("svg.raw-plot")
+            .selectAll("div.raw-plot")
             .data(Object.keys(rawPlots));
         raw.enter()
-            .append("svg")
+            .append("div")
             .merge(raw)
             .attr("class", function (d) {
-                return "raw-plot " + d;
+                return "text-center raw-plot " + d;
             });
         raw.exit().remove();
 
         for (var key in rawPlots) {
-            container.selectAll("svg.raw-plot." + key)
+            container.selectAll("div.raw-plot." + key)
                 .on("mousemove", hover)
                 .datum(data.raw)
                 .call(rawPlots[key].dimensions(dimensions));
