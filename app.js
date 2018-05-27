@@ -1,112 +1,36 @@
 /*global
 d3
 _
+moment
 */
 
 var transientTector = {};
 
-transientTector.timeParse = d3.timeParse("%Y-%m-%d %H:%M:%S.%f");
-transientTector.timeShiftButton = function (directorEvents) {
-    "use strict";
-    var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
-    var container;
-    var data;
-
-    function draw() {
-        return;
-    }
-
-    function constructor(selection) {
-        selection.each(function (d) {
-            container = d3.select(this);
-            data = d;
-            draw();
-        });
-    }
-
-    constructor.dimensions = function (value) {
-        if (!arguments.length) {
-            return dimensions;
-        }
-        dimensions.width = value.width;
-        dimensions.height = value.height;
-        dimensions.parentWidth = value.width;
-        dimensions.parentHeight = value.height;
-        return constructor;
-    };
-    return constructor;
-};
-transientTector.timeZoomInButton = function (directorEvents) {
-    "use strict";
-    var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
-    var container;
-    var data;
-
-    function draw() {
-        return;
-    }
-
-    function constructor(selection) {
-        selection.each(function (d) {
-            container = d3.select(this);
-            data = d;
-            draw();
-        });
-    }
-
-    constructor.dimensions = function (value) {
-        if (!arguments.length) {
-            return dimensions;
-        }
-        dimensions.width = value.width;
-        dimensions.height = value.height;
-        dimensions.parentWidth = value.width;
-        dimensions.parentHeight = value.height;
-        return constructor;
-    };
-    return constructor;
-};
-transientTector.timeZoomOutButton = function (directorEvents) {
-    "use strict";
-    var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
-    var container;
-    var data;
-
-    function draw() {
-        return;
-    }
-
-    function constructor(selection) {
-        selection.each(function (d) {
-            container = d3.select(this);
-            data = d;
-            draw();
-        });
-    }
-
-    constructor.dimensions = function (value) {
-        if (!arguments.length) {
-            return dimensions;
-        }
-        dimensions.width = value.width;
-        dimensions.height = value.height;
-        dimensions.parentWidth = value.width;
-        dimensions.parentHeight = value.height;
-        return constructor;
-    };
-    return constructor;
-};
+transientTector.timeParse = d3.timeParse("%Y-%m-%d %H:%M:%S");
 transientTector.timePlot = function (directorEvents, dataKey) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
     var data;
+    var zoom;
     var scales = {
-        x: d3.scaleTime(),
+        xDisplayed: d3.scaleTime(),
         y: d3.scaleLinear()
     };
+    var axes = {
+        y: d3.axisLeft(scales.y)
+    };
+    var plotLine = d3.line()
+        .x(function (d) {
+            return scales.xDisplayed(d.timestamp);
+        })
+        .y(function (d) {
+            return scales.y(d[dataKey]);
+        })
+        .defined(function (d) {
+            return d;
+        });
     var selectedIndices = [];
-    var dragStartX, dragEndX;
 
     function hover(hoveredCoordinate) {
         container.select("line.hover")
@@ -116,97 +40,72 @@ transientTector.timePlot = function (directorEvents, dataKey) {
             .attr("y2", dimensions.height * 0.8);
     }
 
-    function dragStart() {
-        selectedIndices = [];
-        dragStartX = d3.event.x;
-        dragEndX = d3.event.x;
-    }
+    function zoomed() {
+        container.select("svg").select("path.plot-line")
+            .data([data.raw])
+            .attr("d", plotLine);
+        var now = moment();
+        var pointWidth = scales.xDisplayed(now) - scales.xDisplayed(now.subtract(10, 'minutes'));
+        pointWidth = pointWidth > 1 ? pointWidth : 1;
 
-    function dragging() {
-        var current = d3.event.x;
-        if (dragStartX > current) {
-            dragStartX = current
-        }
-        else if (current > dragEndX) {
-            dragEndX = current
-        }
-        else if (current < dragEndX) {
-            dragStartX = current
-        }
+        var labels = container.select("g.transient-labels").selectAll("rect.transient-label")
+            .data(data.labels);
+        labels.enter()
+            .append("rect")
+            .attr("class", "transient-label")
+            .merge(labels)
+            .attr("x", function (d) {
+                return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
+            })
+            .attr("y", 0)
+            .attr("width", pointWidth)
+            .attr("height", dimensions.height * 0.8)
+            .attr("fill", "blue")
+            //.attr("stroke-width", pointWidth)
+            .attr("opacity", 0.2);
 
-        container.select('rect.selected-range')
-            .attr('width', dragEndX - dragStartX)
-            .attr('height', dimensions.height)
-            .attr('fill', 'lightgrey')
-            .attr('fill-opacity', .6)
-            .attr('x', dragStartX)
-            .attr('y', 0);
-    }
+        var powerStepLabels = container.select("g.powerstep-labels").selectAll("rect.powerstep-label")
+            .data(data.powerStepLabels);
+        powerStepLabels.enter()
+            .append("rect")
+            .attr("class", "powerstep-label")
+            .merge(powerStepLabels)
+            .attr("x", function (d) {
+                return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
+            })
+            .attr("y", 0)
+            .attr("width", pointWidth)
+            .attr("height", dimensions.height * 0.8)
+            .attr("fill", "green")
+            .attr("opacity", 0.2);
 
-    function dragEnd() {
-        selectedIndices = [];
-        var plotSpacing = (dimensions.width) / data.length;
-
-        var current = d3.event.x;
-        if (dragStartX > current) {
-            dragStartX = current
-        }
-        else if (current > dragEndX) {
-            dragEndX = current
-        }
-        else if (current < dragEndX) {
-            dragStartX = current
-        }
-
-        container.select('rect.selected-range')
-            .attr('width', dragEndX - dragStartX)
-            .attr('height', dimensions.height * 0.8)
-            .attr('fill', 'lightgrey')
-            .attr('fill-opacity', .6)
-            .attr('x', dragStartX)
-            .attr('y', 0);
-
-        var startI = scales.x.invert(dragStartX);
-        var endI = scales.x.invert(dragEndX);
-
-        selectedIndices = _.filter(data, function (d) {
-            return d.timestamp >= startI && d.timestamp <= endI;
-        });
-
-        //draw();
-        //onUpdateHovered();
+        var stepSizeLabels = container.select("g.stepsize-labels").selectAll("rect.stepsize-label")
+            .data(data.stepSizeLabels);
+        stepSizeLabels.enter()
+            .append("rect")
+            .attr("class", "stepsize-label")
+            .merge(stepSizeLabels)
+            .attr("x", function (d) {
+                return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
+            })
+            .attr("y", 0)
+            .attr("width", pointWidth)
+            .attr("height", dimensions.height * 0.8)
+            .attr("fill", "orange")
+            .attr("opacity", 0.2);
     }
 
     function draw() {
-        var yExtent = d3.extent(data, function (d) {
+        var yExtent = d3.extent(data.raw, function (d) {
             return d[dataKey];
         });
-        var xExtent = d3.extent(data, function (d) {
-            return d.timestamp;
-        });
-        scales.x.range([(dimensions.width * 0.05), dimensions.width]);
-        scales.y.range([dimensions.height * 0.8, 0]);
-        scales.x.domain(xExtent);
-        scales.y.domain(yExtent);
-
-        var plotLine = d3.line()
-            .x(function (d) {
-                return scales.x(d.timestamp);
-            })
-            .y(function (d) {
-                return scales.y(d[dataKey]);
-            });
-
-
-        var drag_behavior = d3.drag()
-            .on("start", dragStart)
-            .on("drag", dragging)
-            .on("end", dragEnd);
+        scales.y.range([dimensions.height * 0.8, 0])
+            .domain(yExtent);
 
         container.select("svg").select('rect.timeline-hover')
             .attr('width', dimensions.width)
-            .attr('height', dimensions.height * 0.8)
-            .call(drag_behavior);
+            .attr('height', dimensions.height * 0.8);
+        //.call(zoom);
 
         container.select("svg")
             .attr("width", dimensions.width)
@@ -216,19 +115,63 @@ transientTector.timePlot = function (directorEvents, dataKey) {
             .text(dataKey);
 
         container.select("svg").select("path.plot-line")
-            .data([data])
+            .data([data.raw])
             .attr("d", plotLine);
 
-        // Add the X Axis
-        container.select("g.xaxis")
-            .attr("transform", "translate(0," + (dimensions.height) + ")")
-            .call(d3.axisBottom(scales.x));
+        var now = moment();
+        var pointWidth = scales.xDisplayed(now) - scales.xDisplayed(now.subtract(10, 'minutes'));
+        pointWidth = pointWidth > 1 ? pointWidth : 1;
 
-        // Add the Y Axis
+
+        var labels = container.select("g.transient-labels").selectAll("rect.transient-label")
+            .data(data.labels);
+        labels.enter()
+            .append("rect")
+            .attr("class", "transient-label")
+            .merge(labels)
+            .attr("x", function (d) {
+                return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
+            })
+            .attr("y", 0)
+            .attr("width", pointWidth)
+            .attr("height", dimensions.height * 0.8)
+            .attr("fill", "blue")
+            //.attr("stroke-width", pointWidth)
+            .attr("opacity", 0.3);
+
+        var powerStepLabels = container.select("g.powerstep-labels").selectAll("rect.powerstep-label")
+            .data(data.powerStepLabels);
+        powerStepLabels.enter()
+            .append("rect")
+            .attr("class", "powerstep-label")
+            .merge(powerStepLabels)
+            .attr("x", function (d) {
+                return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
+            })
+            .attr("y", 0)
+            .attr("width", pointWidth)
+            .attr("height", dimensions.height * 0.8)
+            .attr("fill", "green")
+            .attr("opacity", 0.3);
+
+        var stepSizeLabels = container.select("g.stepsize-labels").selectAll("rect.stepsize-label")
+            .data(data.stepSizeLabels);
+        stepSizeLabels.enter()
+            .append("rect")
+            .attr("class", "stepsize-label")
+            .merge(stepSizeLabels)
+            .attr("x", function (d) {
+                return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
+            })
+            .attr("y", 0)
+            .attr("width", pointWidth)
+            .attr("height", dimensions.height * 0.8)
+            .attr("fill", "orange")
+            .attr("opacity", 0.3);
+
         container.select("g.yaxis")
             .attr("transform", "translate(" + (dimensions.width * 0.05) + ",0)")
-            .call(d3.axisLeft(scales.y));
-
+            .call(axes.y);
 
     }
 
@@ -245,8 +188,22 @@ transientTector.timePlot = function (directorEvents, dataKey) {
                 .append("h4");
 
             var svg = container.append("svg");
+            svg.append("defs").append("svg:clipPath")
+                .attr("id", "clip")
+                .append("svg:rect")
+                .attr("width", dimensions.width)
+                .attr("height", dimensions.height)
+                .attr("x", 0)
+                .attr("y", 0);
+
             svg.append('rect')
                 .attr("class", "selected-range");
+            svg.append("g")
+                .attr("class", "transient-labels");
+            svg.append("g")
+                .attr("class", "powerstep-labels");
+            svg.append("g")
+                .attr("class", "stepsize-labels");
             svg.append('g')
                 .attr("class", "xaxis");
 
@@ -256,13 +213,19 @@ transientTector.timePlot = function (directorEvents, dataKey) {
                 .attr("stroke-width", ".3")
                 .attr("fill", "none");
 
-            svg.append("path")
+            var focused = svg.append('g')
+                .attr("class", "focus")
+                .attr("clip-path", "url(#clip)");
+
+            focused.append("path")
                 .attr("class", "plot-line")
                 .attr("stroke", "lightgrey")
                 .attr("stroke-width", ".3")
                 .attr("fill", "none");
 
             svg.append("line").attr("class", "hover").attr("stroke", "red");
+
+
             svg.append('rect')
                 .attr("class", "timeline-hover")
                 .attr('fill-opacity', 0)
@@ -282,8 +245,28 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         dimensions.parentHeight = value.height;
         return constructor;
     };
+    constructor.xScale = function (value) {
+        if (!arguments.length) {
+            return scales.xDisplayed;
+        }
+        scales.xDisplayed = value;
+        // axes.x = d3.axisBottom(scales.xDisplayed);
+        return constructor;
+    };
     constructor.hover = function (value) {
         hover(value);
+        return constructor;
+    };
+    constructor.zoom = function (value) {
+        if (!arguments.length) {
+            return zoom;
+        }
+        zoom = value;
+        // axes.x = d3.axisBottom(scales.xDisplayed);
+        return constructor;
+    };
+    constructor.zoomed = function () {
+        zoomed();
         return constructor;
     };
     return constructor;
@@ -294,16 +277,41 @@ transientTector.timeSeries = function (directorEvents) {
     var container;
     var data;
     var fieldOptions = [];
+    var events = {};
     var rawPlots = {
-        "perf_pow": transientTector.timePlot(directorEvents, "perf_pow"),
-        "t5_5": transientTector.timePlot(directorEvents, "t5_5")
+        "perf_pow": transientTector.timePlot(events, "perf_pow"),
+        "t5_5": transientTector.timePlot(events, "t5_5")
     };
-    var eigenPlots = [];
+    var eigenPlots = {
+        "pca_eig0": transientTector.timePlot(events, "pca_eig0")
+    };
+    ;
+    var scales = {
+        xDisplayed: d3.scaleTime(),
+        xFull: d3.scaleTime()
+    };
 
     function hover(d, i) {
         var coord = d3.event.offsetX;
         for (var key in rawPlots) {
             rawPlots[key].hover(coord)
+        }
+        for (var key in eigenPlots) {
+            eigenPlots[key].hover(coord)
+        }
+
+    }
+
+    function zoom() {
+        if (d3.event.sourceEvent && d3.event.sourceEvent.type === "brush") return; // ignore zoom-by-brush
+        var t = d3.event.transform;
+        scales.xDisplayed.domain(t.rescaleX(scales.xFull).domain());
+
+        for (var key in rawPlots) {
+            rawPlots[key].xScale(scales.xDisplayed).zoomed();
+        }
+        for (var key in eigenPlots) {
+            eigenPlots[key].xScale(scales.xDisplayed).zoomed();
         }
     }
 
@@ -311,6 +319,15 @@ transientTector.timeSeries = function (directorEvents) {
         if (!data.raw && !data.pca) {
             return;
         }
+
+        var xExtent = d3.extent(data.raw, function (d) {
+            return d.timestamp;
+        });
+        scales.xDisplayed.range([(dimensions.width * 0.05), dimensions.width]);
+        scales.xFull.range([(dimensions.width * 0.05), dimensions.width]);
+        scales.xDisplayed.domain(xExtent);
+        scales.xFull.domain(xExtent);
+
         var raw = container.select("#timeseries-plots-raw")
             .selectAll("div.raw-plot")
             .data(Object.keys(rawPlots));
@@ -322,12 +339,49 @@ transientTector.timeSeries = function (directorEvents) {
             });
         raw.exit().remove();
 
+        var eigen = container.select("#timeseries-plots-eigen")
+            .selectAll("div.eigen-plot")
+            .data(Object.keys(eigenPlots));
+        eigen.enter()
+            .append("div")
+            .merge(eigen)
+            .attr("class", function (d) {
+                return "text-center eigen-plot " + d;
+            });
+        eigen.exit().remove();
+
+        var zoomer = d3.zoom()
+            .scaleExtent([1, Infinity])
+            .translateExtent([[0, 0], [dimensions.width, dimensions.height * 0.8]])
+            .extent([[0, 0], [dimensions.width, dimensions.height * 0.8]])
+            .on("zoom", zoom);
+
+        container.select("#timeseries-overlay")
+            .attr("style", "width:" + dimensions.width + "px;height:" + dimensions.height + "px;")
+            .on("mousemove", hover)
+            .call(zoomer);
+
+        for (var key in eigenPlots) {
+            container.selectAll("div.eigen-plot." + key)
+                .datum({
+                    raw: data.pca,
+                    labels: data.labels,
+                    powerStepLabels: data.powerStepLabels,
+                    stepSizeLabels: data.stepSizeLabels
+                })
+                .call(eigenPlots[key].xScale(scales.xDisplayed).dimensions(dimensions));
+        }
         for (var key in rawPlots) {
             container.selectAll("div.raw-plot." + key)
-                .on("mousemove", hover)
-                .datum(data.raw)
-                .call(rawPlots[key].dimensions(dimensions));
+                .datum({
+                    raw: data.raw,
+                    labels: data.labels,
+                    powerStepLabels: data.powerStepLabels,
+                    stepSizeLabels: data.stepSizeLabels
+                })
+                .call(rawPlots[key].xScale(scales.xDisplayed).dimensions(dimensions));
         }
+
     }
 
     function constructor(selection) {
@@ -349,66 +403,6 @@ transientTector.timeSeries = function (directorEvents) {
         return constructor;
     };
 
-    return constructor;
-};
-transientTector.reducedZoomInButton = function (directorEvents) {
-    "use strict";
-    var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
-    var container;
-    var data;
-
-    function draw() {
-        return;
-    }
-
-    function constructor(selection) {
-        selection.each(function (d) {
-            container = d3.select(this);
-            data = d;
-            draw();
-        });
-    }
-
-    constructor.dimensions = function (value) {
-        if (!arguments.length) {
-            return dimensions;
-        }
-        dimensions.width = value.width;
-        dimensions.height = value.height;
-        dimensions.parentWidth = value.width;
-        dimensions.parentHeight = value.height;
-        return constructor;
-    };
-    return constructor;
-};
-transientTector.reducedZoomOutButton = function (directorEvents) {
-    "use strict";
-    var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
-    var container;
-    var data;
-
-    function draw() {
-        return;
-    }
-
-    function constructor(selection) {
-        selection.each(function (d) {
-            container = d3.select(this);
-            data = d;
-            draw();
-        });
-    }
-
-    constructor.dimensions = function (value) {
-        if (!arguments.length) {
-            return dimensions;
-        }
-        dimensions.width = value.width;
-        dimensions.height = value.height;
-        dimensions.parentWidth = value.width;
-        dimensions.parentHeight = value.height;
-        return constructor;
-    };
     return constructor;
 };
 transientTector.reducedSpace = function (directorEvents) {
@@ -505,15 +499,97 @@ transientTector.reducedSpace = function (directorEvents) {
     };
     return constructor;
 };
-
 transientTector.stats = function (directorEvents) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
     var data;
+    var scales = {
+        x: d3.scaleLinear(),
+        y: d3.scaleLinear()
+    };
 
     function draw() {
-        return;
+        var clusterData = getStatsForMembership(memberOf());
+        if (!clusterData.length) {
+            return;
+        }
+
+        var xExtent = [0, _.filter(Object.keys(clusterData[0]), function (d) {
+            return d.indexOf("mean") > -1;
+        }).length - 1];
+        var yExtent = d3.extent(_.flatten(_.map(clusterData, function (d) {
+            var result = [];
+            var keys = _.filter(Object.keys(d), function (d) {
+                return d.indexOf("mean") > -1;
+            });
+            for (var i in keys) {
+                result.push(d[keys[i]]);
+            }
+            return result;
+        })));
+
+        scales.x.domain(xExtent);
+        scales.x.range([0, dimensions.width / 10]);
+        scales.y.domain(yExtent);
+        scales.y.range([dimensions.height / 10, 0]);
+
+        var clusters = container.select("#cluster-breakdown")
+            .selectAll("div.cluster")
+            .data(clusterData);
+        if (!clusters) {
+            return;
+        }
+        var clusterWrappers = clusters.enter().append("div").attr("class", "cluster");
+        var clusterSvg = clusterWrappers.append("svg");
+
+        clusterSvg.append("path").attr("class", "stdev").attr("fill", "blue");
+        clusterSvg.append("path").attr("class", "mean").attr("stroke", "red").attr("stroke-width", 1);
+        clusterSvg.append("rect")
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("height", dimensions.height / 10)
+            .attr("width", dimensions.width / 10)
+            .style("stroke", "white")
+            .style("fill", "none")
+            .style("stroke-width", 1);
+        var merged = clusterWrappers.merge(clusters);
+        merged.select("svg")
+            .attr("id", function (d) {
+                return "cluster-" + d.cluster_label
+            })
+            .attr("height", dimensions.height / 10)
+            .attr("width", dimensions.width / 10);
+
+        /*merged.selectAll("path.stdev")
+            .attr("d", d3.area()
+                .x(function(d) { return x(d.date); })
+                .y0(height)
+                .y1(function(d) { return y(d.close); })
+            );
+*/
+        merged.select("path.mean")
+            .attr("d", function (d) {
+                var keys = _.filter(Object.keys(d), function (d) {
+                    return d.indexOf("mean") > -1;
+                });
+                var result = "M";
+                for (var i in keys) {
+                    result += scales.x(i) + " " + scales.y(d[keys[i]]) + " ";
+                }
+
+                return result;
+            });
+    }
+
+    function getStatsForMembership(clusters) {
+        return _.filter(data.clusterStats, function (s) {
+            return s.cluster_label in clusters;
+        })
+    }
+
+    function memberOf() {
+        return _.unique(_.pluck(data.clusterLabels, "cluster_label"));
     }
 
     function constructor(selection) {
@@ -589,59 +665,6 @@ transientTector.psnSelector = function (directorEvents) {
     };
     return constructor;
 };
-transientTector.metricSelector = function (directorEvents) {
-    "use strict";
-    var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
-    var container;
-    var data;
-
-    function onSelect(d) {
-        directorEvents.selectMetric(d.id);
-        container.selectAll(".dropdown-item").attr("class", "dropdown-item");
-        d3.select(this).attr("class", "dropdown-item active");
-        container.select(".dropdown-toggle").text(d.name);
-    }
-
-    function draw() {
-        var menuOptions = container
-            .select(".dropdown-menu")
-            .selectAll(".dropdown-item")
-            .data(data);
-
-        menuOptions.enter()
-            .append("a")
-            .attr("class", "dropdown-item")
-            .attr("href", "#")
-            .on("click", onSelect)
-            .merge(menuOptions)
-            .text(function (d) {
-                return d.name;
-            });
-
-        menuOptions.exit().remove();
-    }
-
-    function constructor(selection) {
-        selection.each(function (d) {
-            container = d3.select(this);
-            data = d;
-            draw();
-        });
-    }
-
-    constructor.dimensions = function (value) {
-        if (!arguments.length) {
-            return dimensions;
-        }
-        dimensions.width = value.width;
-        dimensions.height = value.height;
-        dimensions.parentWidth = value.width;
-        dimensions.parentHeight = value.height;
-        return constructor;
-    };
-
-    return constructor;
-};
 
 transientTector.director = function () {
     "use strict";
@@ -651,26 +674,39 @@ transientTector.director = function () {
     var events = {};
 
     var components = {
-        psnSelector: this.psnSelector(events),
-        metricSelector: this.metricSelector(events),
-        stats: this.stats(events),
-        reducedSpace: this.reducedSpace(events),
-        timeSeries: this.timeSeries(events)
+        psnSelector: transientTector.psnSelector(events),
+        // metricSelector: transientTector.metricSelector(events),
+        stats: transientTector.stats(events),
+        reducedSpace: transientTector.reducedSpace(events),
+        timeSeries: transientTector.timeSeries(events)
     };
 
     function draw() {
-        //setDimensions();
-        //setFilters();
-        container.select("#stats").call(components.stats);
+        container.select("#stats")
+            .datum({
+                clusterStats: data.clusterStats,
+                clusterLabels: data.clusterLabels
+            })
+            .call(components.stats);
         container.select("#psn-selector").datum(data.psn).call(components.psnSelector);
-        container.select("#metric-selector").datum(data.metrics).call(components.metricSelector);
         container.select("#reduced-space").datum(data.pca).call(components.reducedSpace);
-        container.select("#timeseries").datum({pca: data.pca, raw: data.raw}).call(components.timeSeries);
+        container.select("#timeseries").datum({
+            pca: data.pca,
+            raw: data.raw,
+            labels: data.labels,
+            powerStepLabels: data.powerStepLabels,
+            stepSizeLabels: data.stepSizeLabels
+        }).call(components.timeSeries);
     }
 
-    function deferredDraw(error, raw, pca) {
+    function deferredDraw(error, raw, pca, labels, clusterLabels, powerStepLabels, stepSizeLabels) {
         data.raw = raw;
         data.pca = pca;
+        data.labels = labels;
+        data.clusterLabels = clusterLabels;
+        data.powerStepLabels = powerStepLabels;
+        data.stepSizeLabels = stepSizeLabels;
+
         data.raw.forEach(function (d) {
             d.timestamp = transientTector.timeParse(d.timestamp);
             for (var i in data.fields) {
@@ -679,6 +715,32 @@ transientTector.director = function () {
         });
         data.pca.forEach(function (d) {
             d.timestamp = transientTector.timeParse(d.timestamp);
+            var numericCols = ["pca_eig0", "pca_eig1", "pca_eig2", "pca_eig3", "pca_eig4"]
+            for (var i in numericCols) {
+                d[numericCols[i]] = +d[numericCols[i]];
+            }
+        });
+        data.labels.forEach(function (d) {
+            d.timestamp = transientTector.timeParse(d.timestamp);
+            var labelCols = ["kink_finder_labels"]
+            for (var i in labelCols) {
+                d[labelCols[i]] = +d[labelCols[i]];
+            }
+        });
+        data.stepSizeLabels.forEach(function (d) {
+            d.timestamp = transientTector.timeParse(d.timestamp);
+        });
+        data.powerStepLabels.forEach(function (d) {
+            d.timestamp = transientTector.timeParse(d.timestamp);
+        });
+        data.clusterStats.forEach(function (d) {
+            if (data.clusterStats.length == 0) {
+                return;
+            }
+            var labelCols = Object.keys(data.clusterStats[0]);
+            for (var i in labelCols) {
+                d[labelCols[i]] = +d[labelCols[i]];
+            }
         });
         draw();
     }
@@ -688,12 +750,13 @@ transientTector.director = function () {
         d3.queue()
             .defer(d3.csv, "data/model2_preprocessed_data_psn" + psn + ".csv")
             .defer(d3.csv, "data/model2_pca_ncomponents5_psn" + psn + ".csv")
+            .defer(d3.csv, "data/model2_20min_kinkfinder_psn" + psn + ".csv")
+            .defer(d3.csv, "data/model2_20min_kmeans_labels_psn" + psn + ".csv")
+            .defer(d3.csv, "data/model2_powerstepsize_psn" + psn + ".csv")
+            .defer(d3.csv, "data/model2_pca_stepsize_psn" + psn + ".csv")
             .await(deferredDraw);
 
         return psn;
-    };
-    events.selectMetric = function (metric) {
-        return metric;
     };
 
     function constructor(selection) {

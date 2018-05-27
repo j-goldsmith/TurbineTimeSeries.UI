@@ -27,7 +27,7 @@
 </head>
 <body class="container-fluid">
 <header class="text-center">
-    <h1>Turbine Transient 'tector</h1>
+    <h1>Turbine Transient Labeler</h1>
 </header>
 <div class="row">
     <div class="col text-center">
@@ -45,33 +45,21 @@
                 </div>
                 S
             </div>
-            <div id="metric-selector">
-                <button
-                        class="btn btn-secondary dropdown-toggle"
-                        type="button"
-                        data-toggle="dropdown"
-                        aria-haspopup="true"
-                        aria-expanded="false">
-                    Select a Metric
-                </button>
-                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                </div>
-            </div>
         </div>
     </div>
 </div>
 <div class="row">
     <div class="col-md-6">
-
-        <div class="row">
-            <div id="stats" class="col">
-                <h2>Package Stats</h2>
-            </div>
-        </div>
         <div class="row">
             <div id="reduced-space" class="col">
                 <h2>Performance Space</h2>
                 <svg class="scatter"></svg>
+            </div>
+        </div>
+        <div class="row">
+            <div id="stats" class="col">
+                <h2>Package Stats</h2>
+                <div id="cluster-breakdown"></div>
             </div>
         </div>
     </div>
@@ -81,8 +69,10 @@
 
             </div>
             <div id="timeseries-plots" class="col-md-10">
+                <div id="timeseries-overlay"></div>
                 <div id="timeseries-plots-eigen"></div>
                 <div id="timeseries-plots-raw"></div>
+
             </div>
             <div id="timeseries-forward" class="col-md-1">
 
@@ -95,9 +85,10 @@
         .defer(d3.csv, "data/model2_psn.csv")
         .defer(d3.csv, "data/model2_fields.csv")
         .defer(d3.csv, "data/metrics.csv")
+        .defer(d3.csv, "data/model2_20min_cluster_stats.csv")
         .await(init);
 
-    function init(error, psn, fields, metrics) {
+    function init(error, psn, fields, metrics, clusterStats) {
         if (error) {
             console.log(error);
         }
@@ -108,7 +99,12 @@
             .dimensions({width: w, height: h});
 
         d3.select("body")
-            .datum({psn: psn, fields: fields, metrics: metrics})
+            .datum({
+                psn: psn,
+                fields: fields,
+                metrics: metrics,
+                clusterStats:clusterStats
+            })
             .call(dashboard);
     }
 </script>
