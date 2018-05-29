@@ -19,6 +19,7 @@
     <script src="http://underscorejs.org/underscore-min.js"></script>
     <script src="https://momentjs.com/downloads/moment.min.js"></script>
     <script src="https://d3js.org/d3-hexbin.v0.2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/simplify-js@1.2.3/simplify.min.js"></script>
     <script type="application/javascript" src="app.js"></script>
 
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css"
@@ -27,7 +28,7 @@
 </head>
 <body class="container-fluid">
 <header class="text-center">
-    <h1>Turbine Transient Labeler</h1>
+    <h2>Turbine Transient Labeler</h2>
 </header>
 <div class="row">
     <div class="col text-center">
@@ -52,43 +53,61 @@
     <div class="col-md-6">
         <div class="row">
             <div id="reduced-space" class="col">
-                <h2>Performance Space</h2>
+                <h4>Performance Space</h4>
                 <svg class="scatter"></svg>
             </div>
         </div>
         <div class="row">
             <div id="stats" class="col">
-                <h2>Package Stats</h2>
+                <h4>Operating Load Profiles</h4>
                 <div id="cluster-breakdown"></div>
             </div>
         </div>
     </div>
     <div id="timeseries" class="col-md-6">
         <div class="row">
-            <div id="timeseries-back" class="col-md-1">
-
+            <div class="col-md-12 text-center">
+                <div class="btn-group eigenvector-selector">
+                    <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        Composite Features
+                    </button>
+                    <div class="dropdown-menu">
+                    </div>
+                </div>
+                <div class="btn-group raw-feature-selector">
+                    <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        Machine Tags
+                    </button>
+                    <div class="dropdown-menu">
+                    </div>
+                </div>
             </div>
-            <div id="timeseries-plots" class="col-md-10">
+        </div>
+        <div class="row">
+            <div id="timeseries-plots" class="col-md-12">
                 <div id="timeseries-overlay"></div>
                 <div id="timeseries-plots-eigen"></div>
                 <div id="timeseries-plots-raw"></div>
-
             </div>
-            <div id="timeseries-forward" class="col-md-1">
-
-            </div>
+        </div>
+        <div class="row">
+            <svg class="col-md-12">
+                <g class="xaxis"></g>
+            </svg>
         </div>
     </div>
 </div>
+<div id="timeseries-hover" class="popover"></div>
 <script type="application/javascript">
     d3.queue()
         .defer(d3.csv, "data/model2_psn.csv")
         .defer(d3.csv, "data/model2_fields.csv")
+        .defer(d3.csv, "data/model2_composite_fields.csv")
         .defer(d3.csv, "data/metrics.csv")
         .defer(d3.csv, "data/model2_20min_cluster_stats.csv")
         .await(init);
 
-    function init(error, psn, fields, metrics, clusterStats) {
+    function init(error, psn, fields,compositeFields, metrics, clusterStats) {
         if (error) {
             console.log(error);
         }
@@ -102,6 +121,7 @@
             .datum({
                 psn: psn,
                 fields: fields,
+                compositeFields: compositeFields,
                 metrics: metrics,
                 clusterStats:clusterStats
             })

@@ -7,6 +7,7 @@ moment
 var transientTector = {};
 
 transientTector.timeParse = d3.timeParse("%Y-%m-%d %H:%M:%S");
+transientTector.timeFormat = d3.timeFormat("%Y-%m-%d %H:%M");
 transientTector.timePlot = function (directorEvents, dataKey) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
@@ -32,12 +33,21 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         });
     var selectedIndices = [];
 
-    function hover(hoveredCoordinate) {
+    function hover(hoveredCoordinate, closestPoint) {
         container.select("line.hover")
             .attr("x1", hoveredCoordinate)
             .attr("y1", 0)
             .attr("x2", hoveredCoordinate)
             .attr("y2", dimensions.height * 0.8);
+
+        if (closestPoint) {
+            container.select("circle.hover")
+                .attr("cx", scales.xDisplayed(closestPoint.timestamp))
+                .attr("cy", scales.y(closestPoint[dataKey]))
+                .attr("r", 2);
+        }
+
+
     }
 
     function zoomed() {
@@ -59,40 +69,9 @@ transientTector.timePlot = function (directorEvents, dataKey) {
             })
             .attr("y", 0)
             .attr("width", pointWidth)
-            .attr("height", dimensions.height * 0.8)
-            .attr("fill", "blue")
-            //.attr("stroke-width", pointWidth)
-            .attr("opacity", 0.2);
+            .attr("height", dimensions.height * 0.8);
 
-        var powerStepLabels = container.select("g.powerstep-labels").selectAll("rect.powerstep-label")
-            .data(data.powerStepLabels);
-        powerStepLabels.enter()
-            .append("rect")
-            .attr("class", "powerstep-label")
-            .merge(powerStepLabels)
-            .attr("x", function (d) {
-                return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
-            })
-            .attr("y", 0)
-            .attr("width", pointWidth)
-            .attr("height", dimensions.height * 0.8)
-            .attr("fill", "green")
-            .attr("opacity", 0.2);
 
-        var stepSizeLabels = container.select("g.stepsize-labels").selectAll("rect.stepsize-label")
-            .data(data.stepSizeLabels);
-        stepSizeLabels.enter()
-            .append("rect")
-            .attr("class", "stepsize-label")
-            .merge(stepSizeLabels)
-            .attr("x", function (d) {
-                return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
-            })
-            .attr("y", 0)
-            .attr("width", pointWidth)
-            .attr("height", dimensions.height * 0.8)
-            .attr("fill", "orange")
-            .attr("opacity", 0.2);
     }
 
     function draw() {
@@ -111,20 +90,22 @@ transientTector.timePlot = function (directorEvents, dataKey) {
             .attr("width", dimensions.width)
             .attr("height", dimensions.height * 0.8);
 
-        container.select("h4")
+        container.select("h5")
             .text(dataKey);
 
         container.select("svg").select("path.plot-line")
             .data([data.raw])
-            .attr("d", plotLine);
+            .attr("d", simplify(plotLine, .5));
 
         var now = moment();
         var pointWidth = scales.xDisplayed(now) - scales.xDisplayed(now.subtract(10, 'minutes'));
         pointWidth = pointWidth > 1 ? pointWidth : 1;
 
-
-        var labels = container.select("g.transient-labels").selectAll("rect.transient-label")
+        var labels = container
+            .select("g.transient-labels")
+            .selectAll("rect.transient-label")
             .data(data.labels);
+
         labels.enter()
             .append("rect")
             .attr("class", "transient-label")
@@ -134,40 +115,7 @@ transientTector.timePlot = function (directorEvents, dataKey) {
             })
             .attr("y", 0)
             .attr("width", pointWidth)
-            .attr("height", dimensions.height * 0.8)
-            .attr("fill", "blue")
-            //.attr("stroke-width", pointWidth)
-            .attr("opacity", 0.3);
-
-        var powerStepLabels = container.select("g.powerstep-labels").selectAll("rect.powerstep-label")
-            .data(data.powerStepLabels);
-        powerStepLabels.enter()
-            .append("rect")
-            .attr("class", "powerstep-label")
-            .merge(powerStepLabels)
-            .attr("x", function (d) {
-                return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
-            })
-            .attr("y", 0)
-            .attr("width", pointWidth)
-            .attr("height", dimensions.height * 0.8)
-            .attr("fill", "green")
-            .attr("opacity", 0.3);
-
-        var stepSizeLabels = container.select("g.stepsize-labels").selectAll("rect.stepsize-label")
-            .data(data.stepSizeLabels);
-        stepSizeLabels.enter()
-            .append("rect")
-            .attr("class", "stepsize-label")
-            .merge(stepSizeLabels)
-            .attr("x", function (d) {
-                return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
-            })
-            .attr("y", 0)
-            .attr("width", pointWidth)
-            .attr("height", dimensions.height * 0.8)
-            .attr("fill", "orange")
-            .attr("opacity", 0.3);
+            .attr("height", dimensions.height * 0.8);
 
         container.select("g.yaxis")
             .attr("transform", "translate(" + (dimensions.width * 0.05) + ",0)")
@@ -185,7 +133,7 @@ transientTector.timePlot = function (directorEvents, dataKey) {
 
             container.append("div")
                 .attr("class", "plot-title")
-                .append("h4");
+                .append("h5");
 
             var svg = container.append("svg");
             svg.append("defs").append("svg:clipPath")
@@ -204,13 +152,9 @@ transientTector.timePlot = function (directorEvents, dataKey) {
                 .attr("class", "powerstep-labels");
             svg.append("g")
                 .attr("class", "stepsize-labels");
-            svg.append('g')
-                .attr("class", "xaxis");
 
             svg.append('g')
                 .attr("class", "yaxis")
-                .attr("stroke", "lightgrey")
-                .attr("stroke-width", ".3")
                 .attr("fill", "none");
 
             var focused = svg.append('g')
@@ -219,12 +163,10 @@ transientTector.timePlot = function (directorEvents, dataKey) {
 
             focused.append("path")
                 .attr("class", "plot-line")
-                .attr("stroke", "lightgrey")
-                .attr("stroke-width", ".3")
                 .attr("fill", "none");
 
-            svg.append("line").attr("class", "hover").attr("stroke", "red");
-
+            svg.append("line").attr("class", "hover");
+            svg.append("circle").attr("class", "hover");
 
             svg.append('rect')
                 .attr("class", "timeline-hover")
@@ -239,8 +181,8 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         if (!arguments.length) {
             return dimensions;
         }
-        dimensions.width = value.width * 0.8333333;
-        dimensions.height = value.height / 4;
+        dimensions.width = value.width;
+        dimensions.height = value.height / 6;
         dimensions.parentWidth = value.width;
         dimensions.parentHeight = value.height;
         return constructor;
@@ -253,8 +195,8 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         // axes.x = d3.axisBottom(scales.xDisplayed);
         return constructor;
     };
-    constructor.hover = function (value) {
-        hover(value);
+    constructor.hover = function (coord, closestPoint) {
+        hover(coord, closestPoint);
         return constructor;
     };
     constructor.zoom = function (value) {
@@ -285,20 +227,73 @@ transientTector.timeSeries = function (directorEvents) {
     var eigenPlots = {
         "pca_eig0": transientTector.timePlot(events, "pca_eig0")
     };
-    ;
     var scales = {
         xDisplayed: d3.scaleTime(),
         xFull: d3.scaleTime()
     };
-
+    function rawFeatureSelect(d) {
+        if(rawPlots[d.field]){
+            d3.select(this).attr("class", "dropdown-item");
+            delete rawPlots[d.field]
+        } else{
+            d3.select(this).attr("class", "dropdown-item active");
+            rawPlots[d.field] = transientTector.timePlot(events,d.field);
+        }
+        draw();
+    }
+    function eigenvectorSelect(d) {
+        if(eigenPlots[d.field]){
+            d3.select(this).attr("class", "dropdown-item");
+            delete eigenPlots[d.field]
+        } else{
+            d3.select(this).attr("class", "dropdown-item active");
+            eigenPlots[d.field] = transientTector.timePlot(events,d.field);
+        }
+        draw();
+    }
     function hover(d, i) {
         var coord = d3.event.offsetX;
+        var hoveredDate = scales.xDisplayed.invert(coord);
+
+        var rawPoint = _.first(_.sortBy(data.raw, function (d) {
+            return Math.abs(hoveredDate - d.timestamp);
+        }));
+        var eigenPoint = _.first(_.sortBy(data.pca, function (d) {
+            return Math.abs(hoveredDate - d.timestamp);
+        }));
+        var labelPoint = _.find(data.mergedLabels, function (d) {
+            return d.timestamp.getTime() === eigenPoint.timestamp.getTime();
+        });
+
         for (var key in rawPlots) {
-            rawPlots[key].hover(coord)
+            rawPlots[key].hover(coord, rawPoint);
         }
         for (var key in eigenPlots) {
-            eigenPlots[key].hover(coord)
+            eigenPlots[key].hover(coord, eigenPoint);
         }
+
+        var labelDescription = "None";
+        if (labelPoint) {
+            labelDescription = "";
+            labelDescription += labelPoint.kink ? "Kink Finder<br />" : "";
+            labelDescription += labelPoint.powerStep ? "Power Jump<br />" : "";
+            labelDescription += labelPoint.stepSize ? "Step Size<br />" : "";
+            labelDescription += labelPoint.hdbscan ? "HDBScan<br />" : "";
+        }
+
+        var html = "<div class='popover-header'>" + transientTector.timeFormat(rawPoint.timestamp) + "</div>";
+        html += "<table class='table table-sm'><tbody>";
+        for (var plot in eigenPlots) {
+            html += "<tr><td>" + plot + "</td><td>" + eigenPoint[plot] + "</td>";
+        }
+        for (var plot in rawPlots) {
+            html += "<tr><td>" + plot + "</td><td>" + rawPoint[plot] + "</td>";
+        }
+        html += "</tbody></table>";
+        html += "<div>" + labelDescription + "</div>";
+        d3.select("#timeseries-hover")
+            .html(html)
+            .attr("style", "display:block;left:" + (d3.event.pageX + 30) + "px;top:" + (d3.event.pageY - 200) + "px;");
 
     }
 
@@ -313,6 +308,14 @@ transientTector.timeSeries = function (directorEvents) {
         for (var key in eigenPlots) {
             eigenPlots[key].xScale(scales.xDisplayed).zoomed();
         }
+
+        container.select("g.xaxis")
+            .call(d3.axisBottom(scales.xDisplayed))
+            .selectAll("text")
+            .style("text-anchor", "end")
+            .attr("dx", "-.8em")
+            .attr("dy", ".15em")
+            .attr("transform", "rotate(-65)");
     }
 
     function draw() {
@@ -357,17 +360,62 @@ transientTector.timeSeries = function (directorEvents) {
             .on("zoom", zoom);
 
         container.select("#timeseries-overlay")
-            .attr("style", "width:" + dimensions.width + "px;height:" + dimensions.height + "px;")
+            .attr("style", "width:" + (dimensions.width - 30) + "px;height:" + dimensions.height + "px;")
             .on("mousemove", hover)
             .call(zoomer);
+
+        container.select("g.xaxis")
+            .call(d3.axisBottom(scales.xDisplayed)
+                .tickFormat(d3.timeFormat("%Y-%m-%d")))
+            .selectAll("text")
+            .style("text-anchor", "end")
+            .attr("dx", "-.8em")
+            .attr("dy", ".15em")
+            .attr("transform", "rotate(-65)");
+
+        var menuOptions = container.select(".raw-feature-selector")
+            .select(".dropdown-menu")
+            .selectAll(".dropdown-item")
+            .data(data.fields);
+
+        menuOptions.enter()
+            .append("a")
+            .attr("class", function(d) {
+                return rawPlots[d.field] ? "dropdown-item active" : "dropdown-item";
+            })
+            .attr("href", "#")
+            .on("click", rawFeatureSelect)
+            .merge(menuOptions)
+            .text(function (d) {
+                return d.field;
+            });
+
+        menuOptions.exit().remove();
+
+        var menuOptions = container.select(".eigenvector-selector")
+            .select(".dropdown-menu")
+            .selectAll(".dropdown-item")
+            .data(data.compositeFields);
+
+        menuOptions.enter()
+            .append("a")
+            .attr("class", function(d) {
+                return eigenPlots[d.field] ? "dropdown-item active" : "dropdown-item";
+            })
+            .attr("href", "#")
+            .on("click", eigenvectorSelect)
+            .merge(menuOptions)
+            .text(function (d) {
+                return d.name+" - "+d.variance_explained+"%";
+            });
+
+        menuOptions.exit().remove();
 
         for (var key in eigenPlots) {
             container.selectAll("div.eigen-plot." + key)
                 .datum({
                     raw: data.pca,
-                    labels: data.labels,
-                    powerStepLabels: data.powerStepLabels,
-                    stepSizeLabels: data.stepSizeLabels
+                    labels: data.mergedLabels
                 })
                 .call(eigenPlots[key].xScale(scales.xDisplayed).dimensions(dimensions));
         }
@@ -375,9 +423,7 @@ transientTector.timeSeries = function (directorEvents) {
             container.selectAll("div.raw-plot." + key)
                 .datum({
                     raw: data.raw,
-                    labels: data.labels,
-                    powerStepLabels: data.powerStepLabels,
-                    stepSizeLabels: data.stepSizeLabels
+                    labels: data.mergedLabels
                 })
                 .call(rawPlots[key].xScale(scales.xDisplayed).dimensions(dimensions));
         }
@@ -388,6 +434,24 @@ transientTector.timeSeries = function (directorEvents) {
         selection.each(function (d) {
             container = d3.select(this);
             data = d;
+            var kinkDates = _.map(data.kinkLabels, function(d){ return d.timestamp.getTime();});
+            var powerDates = _.map(data.powerStepLabels, function(d){ return d.timestamp.getTime();});
+            var stepDates = _.map(data.stepSizeLabels, function(d){ return d.timestamp.getTime();});
+            var dates = _.union(kinkDates, powerDates, stepDates);
+            var timeParse = d3.timeParse("%Q");
+            data.mergedLabels = _.map(dates, function (d) {
+                var hasKink = _.contains(kinkDates, d) ? 1 : 0;
+                var hasPower = _.contains(powerDates, d) ? 1 : 0;
+                var hasStep = _.contains(stepDates, d) ? 1 : 0;
+                return {
+                    timestamp: timeParse(d),
+                    kink: hasKink,
+                    powerStep: hasPower,
+                    stepSize: hasStep,
+                    hdbscan: 0
+                }
+            });
+
             draw();
         });
     }
@@ -396,7 +460,7 @@ transientTector.timeSeries = function (directorEvents) {
         if (!arguments.length) {
             return dimensions;
         }
-        dimensions.width = value.width / 2;
+        dimensions.width = (value.width / 2);
         dimensions.height = value.height;
         dimensions.parentWidth = value.width;
         dimensions.parentHeight = value.height;
@@ -415,7 +479,7 @@ transientTector.reducedSpace = function (directorEvents) {
         xScale: d3.scaleLinear(),
         yScale: d3.scaleLinear()
     };
-
+    var zoomK = 1;
     function filter(unfilteredData) {
         return _.filter(unfilteredData, function (d) {
             return d.psn === selectedPsn;
@@ -426,11 +490,50 @@ transientTector.reducedSpace = function (directorEvents) {
         return d;
     }
 
+    function zoom() {
+        zoomK = d3.event.transform.k;
+        var filteredData = filter(data);
+
+        var color = d3.scaleSequential(d3.interpolateLab("white", "steelblue"))
+            .domain([0, 50]);
+        var hexbin = d3.hexbin()
+            .x(function (d) {
+                return scales.xScale(d.pca_eig0);
+            })
+            .y(function (d) {
+                return scales.yScale(d.pca_eig1);
+            })
+            .radius(8/zoomK);
+
+        var points = container
+            .select("svg.scatter")
+            .selectAll("path")
+            .data(hexbin(filteredData));
+
+        points.enter()
+            .append("path")
+            .attr("class","hexagon")
+            .merge(points)
+            .attr("d", function (d) {
+                return "M" + d.x + "," + d.y + hexbin.hexagon();
+            })
+            .attr("fill", function (d) {
+                return color(d.length);
+            });
+        points.exit().remove();
+        container.selectAll(".hexagon")
+            .attr("transform", d3.event.transform);
+
+    }
+
+
+
     function draw() {
         var filteredData = filter(data);
         container.select("svg.scatter")
             .attr("height", dimensions.height)
-            .attr("width", dimensions.width);
+            .attr("width", dimensions.width)
+            .call(d3.zoom().scaleExtent([1, 10]).on("zoom", zoom));
         var yExtent = d3.extent(_.map(_.pluck(filteredData, "pca_eig1"), function (d) {
             return parseFloat(d);
         }));
@@ -451,7 +554,8 @@ transientTector.reducedSpace = function (directorEvents) {
             })
             .y(function (d) {
                 return scales.yScale(d.pca_eig1);
-            }).radius(8);
+            })
+            .radius(8);
 
         var points = container
             .select("svg.scatter")
@@ -460,6 +564,7 @@ transientTector.reducedSpace = function (directorEvents) {
 
         points.enter()
             .append("path")
+            .attr("class","hexagon")
             .merge(points)
             .attr("d", function (d) {
                 return "M" + d.x + "," + d.y + hexbin.hexagon();
@@ -514,6 +619,13 @@ transientTector.stats = function (directorEvents) {
         if (!clusterData.length) {
             return;
         }
+        clusterData = _.sortBy(clusterData, function (d) {
+            var clusterDist = _.find(data.clusterDistributions, function (c) {
+                return c.cluster_label == d.cluster_label
+            });
+
+            return clusterDist.minutes * -1;
+        })
 
         var xExtent = [0, _.filter(Object.keys(clusterData[0]), function (d) {
             return d.indexOf("mean") > -1;
@@ -530,10 +642,11 @@ transientTector.stats = function (directorEvents) {
         })));
 
         scales.x.domain(xExtent);
-        scales.x.range([0, dimensions.width / 10]);
+        scales.x.range([0, dimensions.height / 10]);
         scales.y.domain(yExtent);
         scales.y.range([dimensions.height / 10, 0]);
-
+        container.select("#cluster-breakdown")
+            .selectAll("div.cluster").remove();
         var clusters = container.select("#cluster-breakdown")
             .selectAll("div.cluster")
             .data(clusterData);
@@ -542,14 +655,15 @@ transientTector.stats = function (directorEvents) {
         }
         var clusterWrappers = clusters.enter().append("div").attr("class", "cluster");
         var clusterSvg = clusterWrappers.append("svg");
+        var clusterUsage = clusterWrappers.append("div");
 
-        clusterSvg.append("path").attr("class", "stdev").attr("fill", "blue");
-        clusterSvg.append("path").attr("class", "mean").attr("stroke", "red").attr("stroke-width", 1);
+        clusterSvg.append("path").attr("class", "stdev");
+        clusterSvg.append("path").attr("class", "mean");
         clusterSvg.append("rect")
             .attr("x", 0)
             .attr("y", 0)
             .attr("height", dimensions.height / 10)
-            .attr("width", dimensions.width / 10)
+            .attr("width", dimensions.height / 10)
             .style("stroke", "white")
             .style("fill", "none")
             .style("stroke-width", 1);
@@ -559,15 +673,31 @@ transientTector.stats = function (directorEvents) {
                 return "cluster-" + d.cluster_label
             })
             .attr("height", dimensions.height / 10)
-            .attr("width", dimensions.width / 10);
+            .attr("width", dimensions.height / 10);
 
-        /*merged.selectAll("path.stdev")
-            .attr("d", d3.area()
-                .x(function(d) { return x(d.date); })
-                .y0(height)
-                .y1(function(d) { return y(d.close); })
-            );
-*/
+        merged.select("path.stdev")
+            .attr("d", function (d) {
+                var keys = _.filter(Object.keys(d), function (d) {
+                    return d.indexOf("stdev") > -1;
+                });
+
+                var meanKeys = _.filter(Object.keys(d), function (d) {
+                    return d.indexOf("mean") > -1;
+                });
+                var result = "M";
+                for (var i in keys) {
+                    var mean = d[meanKeys[i]];
+                    result += scales.x(i) + " " + scales.y(mean + (d[keys[i]] * 2)) + " ";
+                }
+
+                for (var i = keys.length - 1; i >= 0; i--) {
+                    var mean = d[meanKeys[i]];
+                    result += scales.x(i) + " " + scales.y(mean - (d[keys[i]] * 2)) + " ";
+                }
+
+                return result;
+            });
+
         merged.select("path.mean")
             .attr("d", function (d) {
                 var keys = _.filter(Object.keys(d), function (d) {
@@ -578,18 +708,34 @@ transientTector.stats = function (directorEvents) {
                     result += scales.x(i) + " " + scales.y(d[keys[i]]) + " ";
                 }
 
+
                 return result;
             });
+
+        clusterUsage.html(function (d) {
+            var clusterDist = _.find(data.clusterDistributions, function (c) {
+                return c.cluster_label == d.cluster_label
+            });
+            if (clusterDist) {
+                var percent = d3.format('.2%')(clusterDist.percent);
+                var minutes = d3.format(',')(clusterDist.minutes) + '<br />minutes';
+                return percent + "<br />" + minutes;
+            }
+            else {
+                return "";
+            }
+        })
+
     }
 
     function getStatsForMembership(clusters) {
         return _.filter(data.clusterStats, function (s) {
-            return s.cluster_label in clusters;
+            return _.indexOf(clusters, s.cluster_label) > -1;
         })
     }
 
     function memberOf() {
-        return _.unique(_.pluck(data.clusterLabels, "cluster_label"));
+        return _.unique(_.pluck(data.clusterDistributions, "cluster_label"));
     }
 
     function constructor(selection) {
@@ -685,7 +831,7 @@ transientTector.director = function () {
         container.select("#stats")
             .datum({
                 clusterStats: data.clusterStats,
-                clusterLabels: data.clusterLabels
+                clusterDistributions: data.clusterDistributions
             })
             .call(components.stats);
         container.select("#psn-selector").datum(data.psn).call(components.psnSelector);
@@ -693,17 +839,29 @@ transientTector.director = function () {
         container.select("#timeseries").datum({
             pca: data.pca,
             raw: data.raw,
-            labels: data.labels,
+            kinkLabels: data.kinkLabels,
             powerStepLabels: data.powerStepLabels,
-            stepSizeLabels: data.stepSizeLabels
+            stepSizeLabels: data.stepSizeLabels,
+            fields:data.fields,
+            compositeFields:data.compositeFields
         }).call(components.timeSeries);
     }
 
-    function deferredDraw(error, raw, pca, labels, clusterLabels, powerStepLabels, stepSizeLabels) {
+    function deferredDraw(error,
+                          raw,
+                          pca,
+                          kinkLabels,
+                          clusterLabels,
+                          powerStepLabels,
+                          stepSizeLabels,
+                          clusterDistributions,
+                          hdbscan) {
         data.raw = raw;
         data.pca = pca;
-        data.labels = labels;
+        data.kinkLabels = kinkLabels;
         data.clusterLabels = clusterLabels;
+        data.clusterDistributions = clusterDistributions;
+
         data.powerStepLabels = powerStepLabels;
         data.stepSizeLabels = stepSizeLabels;
 
@@ -720,7 +878,7 @@ transientTector.director = function () {
                 d[numericCols[i]] = +d[numericCols[i]];
             }
         });
-        data.labels.forEach(function (d) {
+        data.kinkLabels.forEach(function (d) {
             d.timestamp = transientTector.timeParse(d.timestamp);
             var labelCols = ["kink_finder_labels"]
             for (var i in labelCols) {
@@ -742,6 +900,12 @@ transientTector.director = function () {
                 d[labelCols[i]] = +d[labelCols[i]];
             }
         });
+        data.clusterDistributions.forEach(function (d) {
+            var labelCols = ["percent", "minutes", "cluster_label"];
+            for (var i in labelCols) {
+                d[labelCols[i]] = +d[labelCols[i]];
+            }
+        });
         draw();
     }
 
@@ -754,6 +918,8 @@ transientTector.director = function () {
             .defer(d3.csv, "data/model2_20min_kmeans_labels_psn" + psn + ".csv")
             .defer(d3.csv, "data/model2_powerstepsize_psn" + psn + ".csv")
             .defer(d3.csv, "data/model2_pca_stepsize_psn" + psn + ".csv")
+            .defer(d3.csv, "data/model2_20min_cluster_distributions_psn" + psn + ".csv")
+            .defer(d3.csv, "data/model2_hdbscan_psn" + psn + ".csv")
             .await(deferredDraw);
 
         return psn;

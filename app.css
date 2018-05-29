@@ -2,10 +2,59 @@ body{
     background-color: #2a2a2a;
 }
 
-h1,h2,h4{
+h1,h2,h4,h5{
     color: #D9830A;
 }
 
 #timeseries-overlay{
     position:absolute;
+}
+
+.cluster{
+    float:left;
+    margin-right:5px;
+    color:lightgrey;
+    text-align: center;
+    font-size:10px;
+}
+
+#timeseries-hover{
+    display:none;
+    position:absolute;
+    width:200px;
+    min-width:100px;
+    background-color:white;
+    border: 1px solid red;
+    font-size:10px;
+}
+
+.transient-label{
+    fill:blue;
+    opacity: .7;
+}
+
+.plot-line{
+     stroke:lightgrey;
+     stroke-width: 1px;
+ }
+
+.yaxis,.xaxis{
+    stroke:lightgrey;
+    stroke-width: 1px;
+}
+
+.stdev{
+    fill:blue;
+}
+.mean{
+    stroke:red;
+    stroke-width:1px;
+}
+
+circle.hover{
+    fill: red;
+}
+line.hover{
+    stroke:red;
+    stroke-width: 1px;
 }
