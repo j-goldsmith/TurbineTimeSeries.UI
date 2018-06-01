@@ -1,9 +1,9 @@
 body{
-    background-color: #2a2a2a;
+    background-color: #16181A;
 }
 
 h1,h2,h4,h5{
-    color: #D9830A;
+    color: #E1E1E1;
 }
 
 #timeseries-overlay{
@@ -13,7 +13,7 @@ h1,h2,h4,h5{
 .cluster{
     float:left;
     margin-right:5px;
-    color:lightgrey;
+    color:#E1E1E1;
     text-align: center;
     font-size:10px;
 }
@@ -24,37 +24,53 @@ h1,h2,h4,h5{
     width:200px;
     min-width:100px;
     background-color:white;
-    border: 1px solid red;
+    border: 1px solid #FF9D8E;
     font-size:10px;
 }
 
 .transient-label{
-    fill:blue;
+    fill:#B16000;
+    opacity: .8;
+}
+
+.timespan{
+    fill:#037798;
     opacity: .7;
 }
 
 .plot-line{
-     stroke:lightgrey;
+     stroke:#E1E1E1;
      stroke-width: 1px;
  }
 
 .yaxis,.xaxis{
-    stroke:lightgrey;
+    stroke:#E1E1E1;
     stroke-width: 1px;
 }
 
 .stdev{
-    fill:blue;
+    fill:#037798;
 }
 .mean{
-    stroke:red;
+    stroke:#FF9D8E;
     stroke-width:1px;
 }
 
 circle.hover{
-    fill: red;
+    fill: #FF9D8E;
 }
 line.hover{
-    stroke:red;
+    stroke:#FF9D8E;
     stroke-width: 1px;
+}
+
+rect.cluster-border{
+    stroke:#E1E1E1;
+    stroke-width: 1;
+    fill:none;
+
+}
+rect.cluster-border.active{
+    stroke:#037798;
+    stroke-width: 2;
 }

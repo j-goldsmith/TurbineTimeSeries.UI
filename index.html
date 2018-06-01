@@ -104,7 +104,7 @@
         .defer(d3.csv, "data/model2_fields.csv")
         .defer(d3.csv, "data/model2_composite_fields.csv")
         .defer(d3.csv, "data/metrics.csv")
-        .defer(d3.csv, "data/model2_20min_cluster_stats.csv")
+        .defer(d3.csv, "data/model2_20min_partition_cluster_stats.csv")
         .await(init);
 
     function init(error, psn, fields,compositeFields, metrics, clusterStats) {

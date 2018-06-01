@@ -31,7 +31,7 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         .defined(function (d) {
             return d;
         });
-    var selectedIndices = [];
+    var selectedTimespans = [];
 
     function hover(hoveredCoordinate, closestPoint) {
         container.select("line.hover")
@@ -58,8 +58,11 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         var pointWidth = scales.xDisplayed(now) - scales.xDisplayed(now.subtract(10, 'minutes'));
         pointWidth = pointWidth > 1 ? pointWidth : 1;
 
-        var labels = container.select("g.transient-labels").selectAll("rect.transient-label")
+        var labels = container
+            .select("g.transient-labels")
+            .selectAll("rect.transient-label")
             .data(data.labels);
+
         labels.enter()
             .append("rect")
             .attr("class", "transient-label")
@@ -67,28 +70,50 @@ transientTector.timePlot = function (directorEvents, dataKey) {
             .attr("x", function (d) {
                 return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
             })
-            .attr("y", 0)
+            .attr("y", dimensions.highlightHeight)
             .attr("width", pointWidth)
-            .attr("height", dimensions.height * 0.8);
+            .attr("height", dimensions.yHeight);
 
+        labels.exit().remove();
 
+        var selectedRanges = container
+            .select("g.selected-timespans")
+            .selectAll("rect.timespan")
+            .data(selectedTimespans);
+
+        selectedRanges.enter()
+            .append("rect")
+            .attr("class", "timespan")
+            .merge(selectedRanges)
+            .attr("x", function (d) {
+                return scales.xDisplayed(moment(d[0]).subtract(5, 'minutes'));
+            })
+            .attr("y", 0)
+            .attr("width", function (d) {
+                var width = Math.abs(scales.xDisplayed(moment(d[1]).add(5, 'minutes')) -
+                    scales.xDisplayed(moment(d[0]).subtract(5, 'minutes')));
+                return width > 1 ? width : 1;
+            })
+            .attr("height", dimensions.plotHeight);
+
+        selectedRanges.exit().remove();
     }
 
     function draw() {
         var yExtent = d3.extent(data.raw, function (d) {
             return d[dataKey];
         });
-        scales.y.range([dimensions.height * 0.8, 0])
+        scales.y.range([dimensions.plotHeight - dimensions.highlightHeight, dimensions.highlightHeight])
             .domain(yExtent);
 
         container.select("svg").select('rect.timeline-hover')
             .attr('width', dimensions.width)
-            .attr('height', dimensions.height * 0.8);
+            .attr('height', dimensions.plotHeight);
         //.call(zoom);
 
         container.select("svg")
             .attr("width", dimensions.width)
-            .attr("height", dimensions.height * 0.8);
+            .attr("height", dimensions.plotHeight);
 
         container.select("h5")
             .text(dataKey);
@@ -113,9 +138,33 @@ transientTector.timePlot = function (directorEvents, dataKey) {
             .attr("x", function (d) {
                 return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
             })
-            .attr("y", 0)
+            .attr("y", dimensions.highlightHeight)
             .attr("width", pointWidth)
-            .attr("height", dimensions.height * 0.8);
+            .attr("height", dimensions.yHeight);
+
+        labels.exit().remove();
+
+        var selectedRanges = container
+            .select("g.selected-timespans")
+            .selectAll("rect.timespan")
+            .data(selectedTimespans);
+
+        selectedRanges.enter()
+            .append("rect")
+            .attr("class", "timespan")
+            .merge(selectedRanges)
+            .attr("x", function (d) {
+                return scales.xDisplayed(moment(d[0]).subtract(5, 'minutes'));
+            })
+            .attr("y", 0)
+            .attr("width", function (d) {
+                var width = Math.abs(scales.xDisplayed(moment(d[1]).add(5, 'minutes')) -
+                    scales.xDisplayed(moment(d[0]).subtract(5, 'minutes')));
+                return width > 1 ? width : 1;
+            })
+            .attr("height", dimensions.plotHeight);
+
+        selectedRanges.exit().remove();
 
         container.select("g.yaxis")
             .attr("transform", "translate(" + (dimensions.width * 0.05) + ",0)")
@@ -140,18 +189,14 @@ transientTector.timePlot = function (directorEvents, dataKey) {
                 .attr("id", "clip")
                 .append("svg:rect")
                 .attr("width", dimensions.width)
-                .attr("height", dimensions.height)
+                .attr("height", dimensions.plotHeight)
                 .attr("x", 0)
                 .attr("y", 0);
 
-            svg.append('rect')
-                .attr("class", "selected-range");
+            svg.append('g')
+                .attr("class", "selected-timespans");
             svg.append("g")
                 .attr("class", "transient-labels");
-            svg.append("g")
-                .attr("class", "powerstep-labels");
-            svg.append("g")
-                .attr("class", "stepsize-labels");
 
             svg.append('g')
                 .attr("class", "yaxis")
@@ -181,8 +226,14 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         if (!arguments.length) {
             return dimensions;
         }
-        dimensions.width = value.width;
+        dimensions.width = value.width - 30;
         dimensions.height = value.height / 6;
+
+        dimensions.titleHeight = dimensions.height * 0.2;
+        dimensions.plotHeight = dimensions.height - dimensions.titleHeight;
+        dimensions.yHeight = dimensions.plotHeight * 0.9;
+        dimensions.highlightHeight = (dimensions.plotHeight - dimensions.yHeight) / 2;
+
         dimensions.parentWidth = value.width;
         dimensions.parentHeight = value.height;
         return constructor;
@@ -211,6 +262,15 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         zoomed();
         return constructor;
     };
+    constructor.selectTimespans = function (value) {
+        if (!arguments.length) {
+            return selectedTimespans;
+        }
+        selectedTimespans = value;
+        draw();
+
+        return constructor;
+    };
     return constructor;
 };
 transientTector.timeSeries = function (directorEvents) {
@@ -231,26 +291,46 @@ transientTector.timeSeries = function (directorEvents) {
         xDisplayed: d3.scaleTime(),
         xFull: d3.scaleTime()
     };
+    var selectedTimestamps = [];
+    var selectedStreaks = [];
+
+
+    function selectTimestamp(){
+        var coord = d3.event.offsetX;
+        var hoveredDate = scales.xDisplayed.invert(coord);
+
+        var rawPoint = _.first(_.sortBy(data.raw, function (d) {
+            return Math.abs(hoveredDate - d.timestamp);
+        }));
+
+        if(!rawPoint){
+            return;
+        }
+        directorEvents.selectTimestamps([rawPoint.timestamp]);
+    }
+
     function rawFeatureSelect(d) {
-        if(rawPlots[d.field]){
+        if (rawPlots[d.field]) {
             d3.select(this).attr("class", "dropdown-item");
             delete rawPlots[d.field]
-        } else{
+        } else {
             d3.select(this).attr("class", "dropdown-item active");
-            rawPlots[d.field] = transientTector.timePlot(events,d.field);
+            rawPlots[d.field] = transientTector.timePlot(events, d.field);
         }
         draw();
     }
+
     function eigenvectorSelect(d) {
-        if(eigenPlots[d.field]){
+        if (eigenPlots[d.field]) {
             d3.select(this).attr("class", "dropdown-item");
             delete eigenPlots[d.field]
-        } else{
+        } else {
             d3.select(this).attr("class", "dropdown-item active");
-            eigenPlots[d.field] = transientTector.timePlot(events,d.field);
+            eigenPlots[d.field] = transientTector.timePlot(events, d.field);
         }
         draw();
     }
+
     function hover(d, i) {
         var coord = d3.event.offsetX;
         var hoveredDate = scales.xDisplayed.invert(coord);
@@ -293,7 +373,7 @@ transientTector.timeSeries = function (directorEvents) {
         html += "<div>" + labelDescription + "</div>";
         d3.select("#timeseries-hover")
             .html(html)
-            .attr("style", "display:block;left:" + (d3.event.pageX + 30) + "px;top:" + (d3.event.pageY - 200) + "px;");
+            .attr("style", "display:block;left:" + (d3.event.pageX + 30) + "px;top:" + (d3.event.pageY + 100) + "px;");
 
     }
 
@@ -362,6 +442,7 @@ transientTector.timeSeries = function (directorEvents) {
         container.select("#timeseries-overlay")
             .attr("style", "width:" + (dimensions.width - 30) + "px;height:" + dimensions.height + "px;")
             .on("mousemove", hover)
+            .on("click", selectTimestamp)
             .call(zoomer);
 
         container.select("g.xaxis")
@@ -380,7 +461,7 @@ transientTector.timeSeries = function (directorEvents) {
 
         menuOptions.enter()
             .append("a")
-            .attr("class", function(d) {
+            .attr("class", function (d) {
                 return rawPlots[d.field] ? "dropdown-item active" : "dropdown-item";
             })
             .attr("href", "#")
@@ -399,14 +480,14 @@ transientTector.timeSeries = function (directorEvents) {
 
         menuOptions.enter()
             .append("a")
-            .attr("class", function(d) {
+            .attr("class", function (d) {
                 return eigenPlots[d.field] ? "dropdown-item active" : "dropdown-item";
             })
             .attr("href", "#")
             .on("click", eigenvectorSelect)
             .merge(menuOptions)
             .text(function (d) {
-                return d.name+" - "+d.variance_explained+"%";
+                return d.name + " - " + d.variance_explained + "%";
             });
 
         menuOptions.exit().remove();
@@ -434,9 +515,15 @@ transientTector.timeSeries = function (directorEvents) {
         selection.each(function (d) {
             container = d3.select(this);
             data = d;
-            var kinkDates = _.map(data.kinkLabels, function(d){ return d.timestamp.getTime();});
-            var powerDates = _.map(data.powerStepLabels, function(d){ return d.timestamp.getTime();});
-            var stepDates = _.map(data.stepSizeLabels, function(d){ return d.timestamp.getTime();});
+            var kinkDates = _.map(data.kinkLabels, function (d) {
+                return d.timestamp.getTime();
+            });
+            var powerDates = _.map(data.powerStepLabels, function (d) {
+                return d.timestamp.getTime();
+            });
+            var stepDates = _.map(data.stepSizeLabels, function (d) {
+                return d.timestamp.getTime();
+            });
             var dates = _.union(kinkDates, powerDates, stepDates);
             var timeParse = d3.timeParse("%Q");
             data.mergedLabels = _.map(dates, function (d) {
@@ -466,7 +553,40 @@ transientTector.timeSeries = function (directorEvents) {
         dimensions.parentHeight = value.height;
         return constructor;
     };
+    constructor.selectTimestamps = function (value) {
+        if (!arguments.length) {
+            return selectedTimestamps;
+        }
+        selectedTimestamps = value.sort();
+        selectedStreaks = (function (selectedTimestamps) {
+            if (selectedTimestamps.length == 0) {
+                return [];
+            }
+            var streaks = [];
+            var currentStreak = [selectedTimestamps[0]];
+            for (var i = 1; i < selectedTimestamps.length; i++) {
+                if (selectedTimestamps[i] - selectedTimestamps[i - 1] === 600000) {
+                    currentStreak.push(selectedTimestamps[i]);
+                }
+                else {
+                    streaks.push([_.min(currentStreak), _.max(currentStreak)]);
+                    currentStreak = [selectedTimestamps[i]];
+                }
+            }
+            streaks.push([_.min(currentStreak), _.max(currentStreak)]);
 
+            return streaks;
+        }(selectedTimestamps));
+
+        for (var key in eigenPlots) {
+            eigenPlots[key].selectTimespans(selectedStreaks);
+        }
+        for (var key in rawPlots) {
+            rawPlots[key].selectTimespans(selectedStreaks);
+        }
+
+        return constructor;
+    };
     return constructor;
 };
 transientTector.reducedSpace = function (directorEvents) {
@@ -480,6 +600,8 @@ transientTector.reducedSpace = function (directorEvents) {
         yScale: d3.scaleLinear()
     };
     var zoomK = 1;
+    var selectedTimestamps = [];
+
     function filter(unfilteredData) {
         return _.filter(unfilteredData, function (d) {
             return d.psn === selectedPsn;
@@ -503,7 +625,7 @@ transientTector.reducedSpace = function (directorEvents) {
             .y(function (d) {
                 return scales.yScale(d.pca_eig1);
             })
-            .radius(8/zoomK);
+            .radius(8 / zoomK);
 
         var points = container
             .select("svg.scatter")
@@ -512,7 +634,7 @@ transientTector.reducedSpace = function (directorEvents) {
 
         points.enter()
             .append("path")
-            .attr("class","hexagon")
+            .attr("class", "hexagon")
             .merge(points)
             .attr("d", function (d) {
                 return "M" + d.x + "," + d.y + hexbin.hexagon();
@@ -525,7 +647,6 @@ transientTector.reducedSpace = function (directorEvents) {
             .attr("transform", d3.event.transform);
 
     }
-
 
 
     function draw() {
@@ -564,7 +685,7 @@ transientTector.reducedSpace = function (directorEvents) {
 
         points.enter()
             .append("path")
-            .attr("class","hexagon")
+            .attr("class", "hexagon")
             .merge(points)
             .attr("d", function (d) {
                 return "M" + d.x + "," + d.y + hexbin.hexagon();
@@ -602,6 +723,13 @@ transientTector.reducedSpace = function (directorEvents) {
         selectedPsn = value;
         return constructor;
     };
+    constructor.selectTimestamps = function (value) {
+        if (!arguments.length) {
+            return selectedTimestamps;
+        }
+        selectedTimestamps = value;
+        return constructor;
+    };
     return constructor;
 };
 transientTector.stats = function (directorEvents) {
@@ -613,6 +741,8 @@ transientTector.stats = function (directorEvents) {
         x: d3.scaleLinear(),
         y: d3.scaleLinear()
     };
+    var selectedTimestamps = [];
+    var selectedClusters = [];
 
     function draw() {
         var clusterData = getStatsForMembership(memberOf());
@@ -630,7 +760,7 @@ transientTector.stats = function (directorEvents) {
         var xExtent = [0, _.filter(Object.keys(clusterData[0]), function (d) {
             return d.indexOf("mean") > -1;
         }).length - 1];
-        var yExtent = d3.extent(_.flatten(_.map(clusterData, function (d) {
+        var yExtent = d3.extent(_.flatten(_.map(data.clusterStats, function (d) {
             var result = [];
             var keys = _.filter(Object.keys(d), function (d) {
                 return d.indexOf("mean") > -1;
@@ -644,7 +774,7 @@ transientTector.stats = function (directorEvents) {
         scales.x.domain(xExtent);
         scales.x.range([0, dimensions.height / 10]);
         scales.y.domain(yExtent);
-        scales.y.range([dimensions.height / 10, 0]);
+        scales.y.range([(dimensions.height / 10) - 5, 5]);
         container.select("#cluster-breakdown")
             .selectAll("div.cluster").remove();
         var clusters = container.select("#cluster-breakdown")
@@ -653,7 +783,15 @@ transientTector.stats = function (directorEvents) {
         if (!clusters) {
             return;
         }
-        var clusterWrappers = clusters.enter().append("div").attr("class", "cluster");
+        var clusterWrappers = clusters.enter()
+            .append("div")
+            .attr("class", function(d){return selectedClusters.indexOf(d.cluster_label) > -1?"cluster active":"cluster";})
+            .on("click", function (d) {
+                var timestamps = _.map(_.unique(_.map(_.filter(data.clusterLabels, function (c) {
+                    return c.cluster_label == d.cluster_label;
+                }), function(d){return d.timestamp.getTime();})), function(d){ return new Date(d);});
+                directorEvents.selectTimestamps(timestamps);
+            });
         var clusterSvg = clusterWrappers.append("svg");
         var clusterUsage = clusterWrappers.append("div");
 
@@ -664,9 +802,9 @@ transientTector.stats = function (directorEvents) {
             .attr("y", 0)
             .attr("height", dimensions.height / 10)
             .attr("width", dimensions.height / 10)
-            .style("stroke", "white")
-            .style("fill", "none")
-            .style("stroke-width", 1);
+            .attr("class", function (d) {
+                return selectedClusters.indexOf(d.cluster_label) > -1? "cluster-border active" : "cluster-border";
+            });
         var merged = clusterWrappers.merge(clusters);
         merged.select("svg")
             .attr("id", function (d) {
@@ -756,6 +894,21 @@ transientTector.stats = function (directorEvents) {
         dimensions.parentHeight = value.height;
         return constructor;
     };
+    constructor.selectTimestamps = function (value) {
+        if (!arguments.length) {
+            return selectedTimestamps;
+        }
+        selectedTimestamps = value;
+        var milliStamps = _.map(selectedTimestamps, function(t){return t.getTime();});
+        selectedClusters = _.unique(_.map(
+            _.filter(data.clusterLabels,function(d){return milliStamps.indexOf(d.timestamp.getTime()) > -1;}),
+            function(d){
+               return +d.cluster_label;
+            }));
+
+        draw();
+        return constructor;
+    };
     return constructor;
 };
 
@@ -831,7 +984,8 @@ transientTector.director = function () {
         container.select("#stats")
             .datum({
                 clusterStats: data.clusterStats,
-                clusterDistributions: data.clusterDistributions
+                clusterDistributions: data.clusterDistributions,
+                clusterLabels: data.clusterLabels
             })
             .call(components.stats);
         container.select("#psn-selector").datum(data.psn).call(components.psnSelector);
@@ -842,8 +996,8 @@ transientTector.director = function () {
             kinkLabels: data.kinkLabels,
             powerStepLabels: data.powerStepLabels,
             stepSizeLabels: data.stepSizeLabels,
-            fields:data.fields,
-            compositeFields:data.compositeFields
+            fields: data.fields,
+            compositeFields: data.compositeFields
         }).call(components.timeSeries);
     }
 
@@ -888,6 +1042,9 @@ transientTector.director = function () {
         data.stepSizeLabels.forEach(function (d) {
             d.timestamp = transientTector.timeParse(d.timestamp);
         });
+        data.clusterLabels.forEach(function (d) {
+            d.timestamp = transientTector.timeParse(d.timestamp);
+        });
         data.powerStepLabels.forEach(function (d) {
             d.timestamp = transientTector.timeParse(d.timestamp);
         });
@@ -914,7 +1071,7 @@ transientTector.director = function () {
         d3.queue()
             .defer(d3.csv, "data/model2_preprocessed_data_psn" + psn + ".csv")
             .defer(d3.csv, "data/model2_pca_ncomponents5_psn" + psn + ".csv")
-            .defer(d3.csv, "data/model2_20min_kinkfinder_psn" + psn + ".csv")
+            .defer(d3.csv, "data/model2_kinkfinder_psn" + psn + ".csv")
             .defer(d3.csv, "data/model2_20min_kmeans_labels_psn" + psn + ".csv")
             .defer(d3.csv, "data/model2_powerstepsize_psn" + psn + ".csv")
             .defer(d3.csv, "data/model2_pca_stepsize_psn" + psn + ".csv")
@@ -923,6 +1080,11 @@ transientTector.director = function () {
             .await(deferredDraw);
 
         return psn;
+    };
+    events.selectTimestamps = function (timestamps) {
+        components.reducedSpace.selectTimestamps(timestamps);
+        components.timeSeries.selectTimestamps(timestamps);
+        components.stats.selectTimestamps(timestamps);
     };
 
     function constructor(selection) {
