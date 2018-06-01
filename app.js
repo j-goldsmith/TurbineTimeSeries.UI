@@ -54,24 +54,25 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         container.select("svg").select("path.plot-line")
             .data([data.raw])
             .attr("d", plotLine);
-        var now = moment();
-        var pointWidth = scales.xDisplayed(now) - scales.xDisplayed(now.subtract(10, 'minutes'));
-        pointWidth = pointWidth > 1 ? pointWidth : 1;
 
         var labels = container
             .select("g.transient-labels")
             .selectAll("rect.transient-label")
-            .data(data.labels);
+            .data(data.labelStreaks);
 
         labels.enter()
             .append("rect")
             .attr("class", "transient-label")
             .merge(labels)
             .attr("x", function (d) {
-                return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
+                return scales.xDisplayed(moment(d[0]).subtract(5, 'minutes'));
             })
             .attr("y", dimensions.highlightHeight)
-            .attr("width", pointWidth)
+            .attr("width", function (d) {
+                var width = Math.abs(scales.xDisplayed(moment(d[1]).add(5, 'minutes')) -
+                    scales.xDisplayed(moment(d[0]).subtract(5, 'minutes')));
+                return width > 1 ? width : 1;
+            })
             .attr("height", dimensions.yHeight);
 
         labels.exit().remove();
@@ -129,17 +130,21 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         var labels = container
             .select("g.transient-labels")
             .selectAll("rect.transient-label")
-            .data(data.labels);
+            .data(data.labelStreaks);
 
         labels.enter()
             .append("rect")
             .attr("class", "transient-label")
             .merge(labels)
             .attr("x", function (d) {
-                return scales.xDisplayed(moment(d.timestamp).subtract(5, 'minutes'));
+                return scales.xDisplayed(moment(d[0]).subtract(5, 'minutes'));
             })
             .attr("y", dimensions.highlightHeight)
-            .attr("width", pointWidth)
+            .attr("width", function (d) {
+                var width = Math.abs(scales.xDisplayed(moment(d[1]).add(5, 'minutes')) -
+                    scales.xDisplayed(moment(d[0]).subtract(5, 'minutes')));
+                return width > 1 ? width : 1;
+            })
             .attr("height", dimensions.yHeight);
 
         labels.exit().remove();
@@ -492,11 +497,13 @@ transientTector.timeSeries = function (directorEvents) {
 
         menuOptions.exit().remove();
 
+        var mergedStreaks = getStreaks(_.pluck(data.mergedLabels,"timestamp").sort());
         for (var key in eigenPlots) {
             container.selectAll("div.eigen-plot." + key)
                 .datum({
                     raw: data.pca,
-                    labels: data.mergedLabels
+                    labels: data.mergedLabels,
+                    labelStreaks: mergedStreaks
                 })
                 .call(eigenPlots[key].xScale(scales.xDisplayed).dimensions(dimensions));
         }
@@ -504,13 +511,32 @@ transientTector.timeSeries = function (directorEvents) {
             container.selectAll("div.raw-plot." + key)
                 .datum({
                     raw: data.raw,
-                    labels: data.mergedLabels
+                    labels: data.mergedLabels,
+                    labelStreaks: mergedStreaks
                 })
                 .call(rawPlots[key].xScale(scales.xDisplayed).dimensions(dimensions));
         }
 
     }
+    function getStreaks(timestamps) {
+        if (timestamps.length == 0) {
+            return [];
+        }
+        var streaks = [];
+        var currentStreak = [timestamps[0]];
+        for (var i = 1; i < timestamps.length; i++) {
+            if (timestamps[i] - timestamps[i - 1] === 600000) {
+                currentStreak.push(timestamps[i]);
+            }
+            else {
+                streaks.push([_.min(currentStreak), _.max(currentStreak)]);
+                currentStreak = [timestamps[i]];
+            }
+        }
+        streaks.push([_.min(currentStreak), _.max(currentStreak)]);
 
+        return streaks;
+    }
     function constructor(selection) {
         selection.each(function (d) {
             container = d3.select(this);
@@ -558,25 +584,7 @@ transientTector.timeSeries = function (directorEvents) {
             return selectedTimestamps;
         }
         selectedTimestamps = value.sort();
-        selectedStreaks = (function (selectedTimestamps) {
-            if (selectedTimestamps.length == 0) {
-                return [];
-            }
-            var streaks = [];
-            var currentStreak = [selectedTimestamps[0]];
-            for (var i = 1; i < selectedTimestamps.length; i++) {
-                if (selectedTimestamps[i] - selectedTimestamps[i - 1] === 600000) {
-                    currentStreak.push(selectedTimestamps[i]);
-                }
-                else {
-                    streaks.push([_.min(currentStreak), _.max(currentStreak)]);
-                    currentStreak = [selectedTimestamps[i]];
-                }
-            }
-            streaks.push([_.min(currentStreak), _.max(currentStreak)]);
-
-            return streaks;
-        }(selectedTimestamps));
+        selectedStreaks = getStreaks(selectedTimestamps);
 
         for (var key in eigenPlots) {
             eigenPlots[key].selectTimespans(selectedStreaks);
