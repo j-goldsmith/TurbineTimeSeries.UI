@@ -8,6 +8,132 @@ var transientTector = {};
 
 transientTector.timeParse = d3.timeParse("%Y-%m-%d %H:%M:%S");
 transientTector.timeFormat = d3.timeFormat("%Y-%m-%d %H:%M");
+transientTector.colors = {
+    blue: [
+        '#7DD0E7',
+        '#3FB6D8',
+        '#0DA3CE',
+        '#037798',
+        '#024F65'
+    ],
+    red: [
+        '#FF9D8E',
+        '#FF6A53',
+        '#FF3C1D',
+        '#C31B01',
+        '#811200'
+    ],
+    purple: [
+        '#E8D6EC',
+        '#B894BF',
+        '#885692',
+        '#632C6E',
+        '#3F1049'
+    ],
+    orange: [
+        '#FFC279',
+        '#FFA73F',
+        '#F38400',
+        '#B16000',
+        '#6E3C00'
+    ],
+    green: [
+        '#DDF58B',
+        '#AECB49',
+        '#86A322',
+        '#597203',
+        '#263100'
+    ],
+    grey: [
+        '#E1E1E1',
+        '#919394',
+        '#6A6C6E',
+        '#46484B',
+        '#16181A'
+    ]
+};
+transientTector.dashboardStateDescription = function (directorEvents) {
+    var container;
+    var data;
+    var dimensions = {};
+    var selectedTimestamps = [];
+
+    function draw() {
+        if(!data.pca){
+            return;
+        }
+
+        var dataCount = data.pca.length;
+        var minDate = data.pca[0].timestamp;
+        var maxDate = data.pca[dataCount - 1].timestamp;
+        var dayDiff = moment(maxDate).diff(moment(minDate), "days");
+
+        var transientCount = data.mergedLabels ? data.mergedLabels.length:0;
+        var selectedCount = selectedTimestamps.length;
+
+        container.select("#data-count")
+            .html(dataCount + " data point" + (dataCount != 1 ? "s" : "") + " across " + dayDiff + " day" + (dayDiff != 1 ? "s" : ""));
+
+        container.select("#transient-count")
+            .html(transientCount + " labeled transient" + (transientCount != 1 ? "s" : ""));
+
+        container.select("#selected-count")
+            .html(selectedCount + " data point" + (selectedCount != 1 ? "s" : "") + " selected");
+
+        if(selectedCount){
+            container.select(".selected-color")
+                .attr("data-toggle","modal")
+                .attr("data-target","#annotation")
+                .html("<i class='fas fa-square fa-stack-2x'></i><i class='fas fa-edit fa-fw fa-stack-1x'></i>");
+
+        }
+        else{
+            container.select(".selected-color")
+                .attr("data-toggle",null)
+                .attr("data-target",null)
+                .html("<i class='fas fa-square fa-stack-2x' />");
+        }
+
+        container.select("#annotation").select(".save")
+            .on("click", directorEvents.addNote)
+    }
+
+    function constructor(selection) {
+        selection.each(function (d) {
+            container = d3.select(this);
+            data = d;
+            draw();
+        });
+    }
+
+    constructor.selectTimestamps = function (value) {
+        if (!arguments.length) {
+            return selectedTimestamps;
+        }
+        selectedTimestamps = value;
+        draw();
+        return constructor;
+    };
+    constructor.selectedLabelTypes = function (types) {
+        if (!arguments.length) {
+            return selectedLabelTypes;
+        }
+        selectedLabelTypes = types;
+        return constructor;
+    };
+    constructor.dimensions = function (value) {
+        if (!arguments.length) {
+            return dimensions;
+        }
+        dimensions.width = value.width;
+        dimensions.height = value.height;
+        dimensions.parentWidth = value.width;
+        dimensions.parentHeight = value.height;
+        return constructor;
+    };
+
+    return constructor;
+};
 transientTector.timePlot = function (directorEvents, dataKey) {
     "use strict";
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
@@ -232,7 +358,7 @@ transientTector.timePlot = function (directorEvents, dataKey) {
             return dimensions;
         }
         dimensions.width = value.width - 30;
-        dimensions.height = value.height / 6;
+        dimensions.height = value.height / 5;
 
         dimensions.titleHeight = dimensions.height * 0.2;
         dimensions.plotHeight = dimensions.height - dimensions.titleHeight;
@@ -298,9 +424,9 @@ transientTector.timeSeries = function (directorEvents) {
     };
     var selectedTimestamps = [];
     var selectedStreaks = [];
+    var selectedLabelTypes = [];
 
-
-    function selectTimestamp(){
+    function selectTimestamp() {
         var coord = d3.event.offsetX;
         var hoveredDate = scales.xDisplayed.invert(coord);
 
@@ -308,7 +434,7 @@ transientTector.timeSeries = function (directorEvents) {
             return Math.abs(hoveredDate - d.timestamp);
         }));
 
-        if(!rawPoint){
+        if (!rawPoint) {
             return;
         }
         directorEvents.selectTimestamps([rawPoint.timestamp]);
@@ -448,8 +574,11 @@ transientTector.timeSeries = function (directorEvents) {
             .attr("style", "width:" + (dimensions.width - 30) + "px;height:" + dimensions.height + "px;")
             .on("mousemove", hover)
             .on("click", selectTimestamp)
+            .on("mouseout", function () {
+                d3.select("#timeseries-hover").attr("style", "display:none;");
+            })
             .call(zoomer);
-
+        container.select("#xaxis").attr("height", dimensions.height * .15);
         container.select("g.xaxis")
             .call(d3.axisBottom(scales.xDisplayed)
                 .tickFormat(d3.timeFormat("%Y-%m-%d")))
@@ -497,7 +626,7 @@ transientTector.timeSeries = function (directorEvents) {
 
         menuOptions.exit().remove();
 
-        var mergedStreaks = getStreaks(_.pluck(data.mergedLabels,"timestamp").sort());
+        var mergedStreaks = getStreaks(_.pluck(data.mergedLabels, "timestamp").sort());
         for (var key in eigenPlots) {
             container.selectAll("div.eigen-plot." + key)
                 .datum({
@@ -518,6 +647,7 @@ transientTector.timeSeries = function (directorEvents) {
         }
 
     }
+
     function getStreaks(timestamps) {
         if (timestamps.length == 0) {
             return [];
@@ -537,33 +667,11 @@ transientTector.timeSeries = function (directorEvents) {
 
         return streaks;
     }
+
     function constructor(selection) {
         selection.each(function (d) {
             container = d3.select(this);
             data = d;
-            var kinkDates = _.map(data.kinkLabels, function (d) {
-                return d.timestamp.getTime();
-            });
-            var powerDates = _.map(data.powerStepLabels, function (d) {
-                return d.timestamp.getTime();
-            });
-            var stepDates = _.map(data.stepSizeLabels, function (d) {
-                return d.timestamp.getTime();
-            });
-            var dates = _.union(kinkDates, powerDates, stepDates);
-            var timeParse = d3.timeParse("%Q");
-            data.mergedLabels = _.map(dates, function (d) {
-                var hasKink = _.contains(kinkDates, d) ? 1 : 0;
-                var hasPower = _.contains(powerDates, d) ? 1 : 0;
-                var hasStep = _.contains(stepDates, d) ? 1 : 0;
-                return {
-                    timestamp: timeParse(d),
-                    kink: hasKink,
-                    powerStep: hasPower,
-                    stepSize: hasStep,
-                    hdbscan: 0
-                }
-            });
 
             draw();
         });
@@ -574,7 +682,7 @@ transientTector.timeSeries = function (directorEvents) {
             return dimensions;
         }
         dimensions.width = (value.width / 2);
-        dimensions.height = value.height;
+        dimensions.height = value.height * 0.65;
         dimensions.parentWidth = value.width;
         dimensions.parentHeight = value.height;
         return constructor;
@@ -595,6 +703,13 @@ transientTector.timeSeries = function (directorEvents) {
 
         return constructor;
     };
+    constructor.selectedLabelTypes = function (types) {
+        if (!arguments.length) {
+            return selectedLabelTypes;
+        }
+        selectedLabelTypes = types;
+        return constructor;
+    };
     return constructor;
 };
 transientTector.reducedSpace = function (directorEvents) {
@@ -609,56 +724,156 @@ transientTector.reducedSpace = function (directorEvents) {
     };
     var zoomK = 1;
     var selectedTimestamps = [];
+    var selectedLabelTypes = [];
+    var selectedLabelData = [];
+    var selectedAxes = {
+        x: "pca_eig0",
+        y: "pca_eig1"
+    }
+    var color = d3.scaleLinear().range(transientTector.colors.green)
+        .domain([0, 50]);
+    var selectedColor = d3.scaleLinear().range(transientTector.colors.blue)
+        .domain([0, 50]);
+    var transientColor = d3.scaleLinear().range(transientTector.colors.orange)
+        .domain([0, 50]);
 
-    function filter(unfilteredData) {
-        return _.filter(unfilteredData, function (d) {
-            return d.psn === selectedPsn;
-        });
+    function xAxisSelect(d) {
+        selectedAxes.x = d.field;
+        draw();
+    }
+
+    function yAxisSelect(d) {
+        selectedAxes.y = d.field;
+        draw();
     }
 
     function onSelect(d) {
         return d;
     }
 
-    function zoom() {
-        zoomK = d3.event.transform.k;
-        var filteredData = filter(data);
+    function hover(d, i) {
 
-        var color = d3.scaleSequential(d3.interpolateLab("white", "steelblue"))
-            .domain([0, 50]);
+        var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (d) {
+            return d.getTime()
+        });
+        var selectedTime = _.map(selectedTimestamps, function (d) {
+            return d.getTime();
+        });
+
+        var selected = _.intersection(selectedTime, binnedTimestamps).length;
+        var hasTransient = _.intersection(selectedLabelData, binnedTimestamps).length;
+        var html = "<div class='popover-header'>" + d.length + " data points</div>";
+        html += "<table class='table table-sm'><tbody>";
+        html += "<tr><td>" + selected + "</td><td>selected</td>";
+        html += "<tr><td>" + hasTransient + "</td><td>labeled transients</td>";
+        html += "</tbody></table>";
+        d3.select("#timeseries-hover")
+            .html(html)
+            .attr("style", "display:block;left:" + (d3.event.pageX + 30) + "px;top:" + (d3.event.pageY + 100) + "px;");
+
+    }
+
+    function drawHexBins() {
         var hexbin = d3.hexbin()
             .x(function (d) {
-                return scales.xScale(d.pca_eig0);
+                return scales.xScale(d[selectedAxes.x]);
             })
             .y(function (d) {
-                return scales.yScale(d.pca_eig1);
+                return scales.yScale(d[selectedAxes.y]);
             })
             .radius(8 / zoomK);
 
         var points = container
             .select("svg.scatter")
             .selectAll("path")
-            .data(hexbin(filteredData));
+            .data(hexbin(data.pca));
 
         points.enter()
             .append("path")
             .attr("class", "hexagon")
+            .on("click", function (d) {
+                var timestamps = _.map(
+                    _.unique(
+                        _.flatten(
+                            [_.map(d, function (c) {
+                                return c.timestamp.getTime();
+                            }),
+                                _.map(selectedTimestamps, function (c) {
+                                    return c.getTime();
+                                })]
+                        )
+                    ),
+                    function (c) {
+                        return new Date(c);
+                    }
+                );
+
+                directorEvents.selectTimestamps(timestamps);
+            })
+            .on("contextmenu", function (d, i) {
+                d3.event.preventDefault();
+                directorEvents.selectTimestamps([]);
+            })
+            .on("mouseover", hover)
+            .on("mouseout", function () {
+                d3.select("#timeseries-hover").attr("style", "display:none;");
+            })
             .merge(points)
             .attr("d", function (d) {
                 return "M" + d.x + "," + d.y + hexbin.hexagon();
             })
             .attr("fill", function (d) {
-                return color(d.length);
+                var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (d) {
+                    return d.getTime()
+                });
+                var selectedTime = _.map(selectedTimestamps, function (d) {
+                    return d.getTime();
+                });
+
+                var selected = _.intersection(selectedTime, binnedTimestamps).length > 0 ? true : false;
+                if (selected) {
+                    return selectedColor(d.length);
+                }
+                var hasTransient = _.intersection(selectedLabelData, binnedTimestamps).length > 0 ? true : false;
+                if (hasTransient) {
+                    return transientColor(d.length);
+                }
+                else {
+                    return color(d.length);
+                }
             });
         points.exit().remove();
+    }
+
+    function zoom() {
+        zoomK = d3.event.transform.k;
+
+        drawHexBins();
         container.selectAll(".hexagon")
             .attr("transform", d3.event.transform);
 
     }
 
+    function labelTypeSelect(d) {
+        if (d3.select(this).attr("class").indexOf("active") > -1) {
+            d3.select(this).attr("class", "dropdown-item");
+            selectedLabelData = [];
+
+        } else {
+            d3.select(this).attr("class", "dropdown-item active");
+            selectedLabelData = _.map(_.pluck(data[d.dataKey], "timestamp"), function (d) {
+                return d.getTime()
+            });
+        }
+        draw();
+    }
 
     function draw() {
-        var filteredData = filter(data);
+        var filteredData = data.pca;
+        if (!filteredData) {
+            return;
+        }
+
         container.select("svg.scatter")
             .attr("height", dimensions.height)
             .attr("width", dimensions.width)
@@ -675,34 +890,46 @@ transientTector.reducedSpace = function (directorEvents) {
 
         scales.yScale.domain(yExtent);
         scales.yScale.range([dimensions.height - 10, 10]);
-        var color = d3.scaleSequential(d3.interpolateLab("white", "steelblue"))
-            .domain([0, 50]);
-        var hexbin = d3.hexbin()
-            .x(function (d) {
-                return scales.xScale(d.pca_eig0);
-            })
-            .y(function (d) {
-                return scales.yScale(d.pca_eig1);
-            })
-            .radius(8);
 
-        var points = container
-            .select("svg.scatter")
-            .selectAll("path")
-            .data(hexbin(filteredData));
+        var menuOptions = container.select(".x-selector")
+            .select(".dropdown-menu")
+            .selectAll(".dropdown-item")
+            .data(data.compositeFields);
 
-        points.enter()
-            .append("path")
-            .attr("class", "hexagon")
-            .merge(points)
-            .attr("d", function (d) {
-                return "M" + d.x + "," + d.y + hexbin.hexagon();
+        menuOptions.enter()
+            .append("a")
+            .attr("href", "#")
+            .on("click", xAxisSelect)
+            .merge(menuOptions)
+            .attr("class", function (d) {
+                return selectedAxes.x === d.field ? "dropdown-item active" : "dropdown-item";
             })
-            .attr("fill", function (d) {
-                return color(d.length);
+            .text(function (d) {
+                return d.name + " - " + d.variance_explained + "%";
             });
 
-        points.exit().remove();
+        menuOptions.exit().remove();
+
+        var menuOptions = container.select(".y-selector")
+            .select(".dropdown-menu")
+            .selectAll(".dropdown-item")
+            .data(data.compositeFields);
+
+        menuOptions.enter()
+            .append("a")
+            .attr("href", "#")
+            .on("click", yAxisSelect)
+            .merge(menuOptions)
+            .attr("class", function (d) {
+                return selectedAxes.y === d.field ? "dropdown-item active" : "dropdown-item";
+            })
+            .text(function (d) {
+                return d.name + " - " + d.variance_explained + "%";
+            });
+
+        menuOptions.exit().remove();
+
+        drawHexBins();
     }
 
     function constructor(selection) {
@@ -736,6 +963,23 @@ transientTector.reducedSpace = function (directorEvents) {
             return selectedTimestamps;
         }
         selectedTimestamps = value;
+        draw();
+        return constructor;
+    };
+    constructor.selectedLabelTypes = function (types) {
+        if (!arguments.length) {
+            return selectedLabelTypes;
+        }
+        selectedLabelTypes = types;
+        selectedLabelData = [];
+        selectedLabelData = _.union(_.flatten(
+            _.map(
+                selectedLabelTypes,
+                function (d) {
+                    return _.map(data[d.dataKey], function (c) {
+                        return c.timestamp.getTime();
+                    });
+                })));
         return constructor;
     };
     return constructor;
@@ -793,11 +1037,17 @@ transientTector.stats = function (directorEvents) {
         }
         var clusterWrappers = clusters.enter()
             .append("div")
-            .attr("class", function(d){return selectedClusters.indexOf(d.cluster_label) > -1?"cluster active":"cluster";})
+            .attr("class", function (d) {
+                return selectedClusters.indexOf(d.cluster_label) > -1 ? "cluster active" : "cluster";
+            })
             .on("click", function (d) {
                 var timestamps = _.map(_.unique(_.map(_.filter(data.clusterLabels, function (c) {
                     return c.cluster_label == d.cluster_label;
-                }), function(d){return d.timestamp.getTime();})), function(d){ return new Date(d);});
+                }), function (d) {
+                    return d.timestamp.getTime();
+                })), function (d) {
+                    return new Date(d);
+                });
                 directorEvents.selectTimestamps(timestamps);
             });
         var clusterSvg = clusterWrappers.append("svg");
@@ -811,7 +1061,7 @@ transientTector.stats = function (directorEvents) {
             .attr("height", dimensions.height / 10)
             .attr("width", dimensions.height / 10)
             .attr("class", function (d) {
-                return selectedClusters.indexOf(d.cluster_label) > -1? "cluster-border active" : "cluster-border";
+                return selectedClusters.indexOf(d.cluster_label) > -1 ? "cluster-border active" : "cluster-border";
             });
         var merged = clusterWrappers.merge(clusters);
         merged.select("svg")
@@ -907,11 +1157,15 @@ transientTector.stats = function (directorEvents) {
             return selectedTimestamps;
         }
         selectedTimestamps = value;
-        var milliStamps = _.map(selectedTimestamps, function(t){return t.getTime();});
+        var milliStamps = _.map(selectedTimestamps, function (t) {
+            return t.getTime();
+        });
         selectedClusters = _.unique(_.map(
-            _.filter(data.clusterLabels,function(d){return milliStamps.indexOf(d.timestamp.getTime()) > -1;}),
-            function(d){
-               return +d.cluster_label;
+            _.filter(data.clusterLabels, function (d) {
+                return milliStamps.indexOf(d.timestamp.getTime()) > -1;
+            }),
+            function (d) {
+                return +d.cluster_label;
             }));
 
         draw();
@@ -979,15 +1233,31 @@ transientTector.director = function () {
     var data;
     var dimensions = {width: 0, height: 0};
     var events = {};
-
+    var notes = [];
     var components = {
         psnSelector: transientTector.psnSelector(events),
         // metricSelector: transientTector.metricSelector(events),
         stats: transientTector.stats(events),
         reducedSpace: transientTector.reducedSpace(events),
-        timeSeries: transientTector.timeSeries(events)
+        timeSeries: transientTector.timeSeries(events),
+        dashboardState: transientTector.dashboardStateDescription(events)
     };
-
+    var labelTypes = [
+        {
+            display: "Kink Finder",
+            dataKey: "kinkLabels"
+        },
+        {
+            display: "Step Size",
+            dataKey: "stepSizeLabels"
+        },
+        {
+            display: "Power Jump",
+            dataKey: "powerStepLabels"
+        }];
+    var selectedTimestamps = [];
+    var selectedLabelTypes = [];
+    var selectedPsn;
     function draw() {
         container.select("#stats")
             .datum({
@@ -997,16 +1267,48 @@ transientTector.director = function () {
             })
             .call(components.stats);
         container.select("#psn-selector").datum(data.psn).call(components.psnSelector);
-        container.select("#reduced-space").datum(data.pca).call(components.reducedSpace);
+        container.select("#reduced-space").datum({
+            pca: data.pca,
+            kinkLabels: data.kinkLabels,
+            powerStepLabels: data.powerStepLabels,
+            stepSizeLabels: data.stepSizeLabels,
+            compositeFields: data.compositeFields
+        }).call(components.reducedSpace.selectedLabelTypes(selectedLabelTypes));
         container.select("#timeseries").datum({
             pca: data.pca,
             raw: data.raw,
+            mergedLabels: data.mergedLabels,
             kinkLabels: data.kinkLabels,
             powerStepLabels: data.powerStepLabels,
             stepSizeLabels: data.stepSizeLabels,
             fields: data.fields,
             compositeFields: data.compositeFields
-        }).call(components.timeSeries);
+        }).call(components.timeSeries.selectedLabelTypes(selectedLabelTypes));
+        container.select(".dashboard-state-description")
+            .datum({
+                pca: data.pca,
+                mergedLabels: data.mergedLabels
+            }).call(components.dashboardState.selectedLabelTypes(selectedLabelTypes));
+
+        var menuOptions = container.select("#metric-selector")
+            .select(".dropdown-menu");
+
+        menuOptions = menuOptions.selectAll(".dropdown-item")
+            .data(labelTypes);
+
+        menuOptions.enter()
+            .append("a")
+            .attr("href", "#")
+            .on("click", events.selectLabelType)
+            .merge(menuOptions)
+            .attr("class", function (d) {
+                return selectedLabelTypes.indexOf(d) > -1 ? "dropdown-item active" : "dropdown-item";
+            })
+            .text(function (d) {
+                return d.display;
+            });
+
+        menuOptions.exit().remove();
     }
 
     function deferredDraw(error,
@@ -1075,6 +1377,8 @@ transientTector.director = function () {
     }
 
     events.selectPsn = function (psn) {
+        selectedPsn = psn;
+
         components.reducedSpace.psn(psn);
         d3.queue()
             .defer(d3.csv, "data/model2_preprocessed_data_psn" + psn + ".csv")
@@ -1090,11 +1394,75 @@ transientTector.director = function () {
         return psn;
     };
     events.selectTimestamps = function (timestamps) {
+        selectedTimestamps = timestamps;
+
         components.reducedSpace.selectTimestamps(timestamps);
         components.timeSeries.selectTimestamps(timestamps);
         components.stats.selectTimestamps(timestamps);
+        components.dashboardState.selectTimestamps(timestamps);
     };
+    events.selectLabelType = function (type) {
+        if (selectedLabelTypes.indexOf(type) > -1) {
+            selectedLabelTypes.splice(selectedLabelTypes.indexOf(type), 1);
+        }
+        else {
+            selectedLabelTypes.push(type);
+        }
 
+        var kinkDates = _.find(selectedLabelTypes, function (c) {
+            return c.dataKey === "kinkLabels"
+        })
+            ? _.map(data.kinkLabels, function (d) {
+                return d.timestamp.getTime();
+            })
+            : [];
+        var powerDates = _.find(selectedLabelTypes, function (c) {
+            return c.dataKey === "powerStepLabels"
+        })
+            ? _.map(data.powerStepLabels, function (d) {
+                return d.timestamp.getTime();
+            })
+            : [];
+        var stepDates = _.find(selectedLabelTypes, function (c) {
+            return c.dataKey === "stepSizeLabels"
+        })
+            ? _.map(data.stepSizeLabels, function (d) {
+                return d.timestamp.getTime();
+            })
+            : [];
+        var dates = _.union(kinkDates, powerDates, stepDates);
+        var timeParse = d3.timeParse("%Q");
+        data.mergedLabels = _.map(dates, function (d) {
+            var hasKink = _.contains(kinkDates, d) ? 1 : 0;
+            var hasPower = _.contains(powerDates, d) ? 1 : 0;
+            var hasStep = _.contains(stepDates, d) ? 1 : 0;
+            return {
+                timestamp: timeParse(d),
+                kink: hasKink,
+                powerStep: hasPower,
+                stepSize: hasStep,
+                hdbscan: 0
+            }
+        });
+
+
+        draw();
+    };
+    events.addNote = function(){
+        var annotation = d3.select("#annotation")
+        var label = annotation.select("#transient-select").property("value");
+        var note = annotation.select("#data-notes").property("value");
+
+        notes.push({
+            psn:selectedPsn,
+            timestamps: selectedTimestamps,
+            label: label,
+            note:note
+        });
+        $("#annotation").modal("hide");
+        document.getElementById("transient-select").value = "Not Transient";
+        document.getElementById("data-notes").value = "";
+    }
     function constructor(selection) {
         selection.each(function (d) {
             container = d3.select(this);
