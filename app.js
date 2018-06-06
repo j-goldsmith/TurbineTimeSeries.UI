@@ -59,7 +59,7 @@ transientTector.dashboardStateDescription = function (directorEvents) {
     var selectedTimestamps = [];
 
     function draw() {
-        if(!data.pca){
+        if (!data.pca) {
             return;
         }
 
@@ -68,7 +68,7 @@ transientTector.dashboardStateDescription = function (directorEvents) {
         var maxDate = data.pca[dataCount - 1].timestamp;
         var dayDiff = moment(maxDate).diff(moment(minDate), "days");
 
-        var transientCount = data.mergedLabels ? data.mergedLabels.length:0;
+        var transientCount = data.mergedLabels ? data.mergedLabels.length : 0;
         var selectedCount = selectedTimestamps.length;
 
         container.select("#data-count")
@@ -80,17 +80,17 @@ transientTector.dashboardStateDescription = function (directorEvents) {
         container.select("#selected-count")
             .html(selectedCount + " data point" + (selectedCount != 1 ? "s" : "") + " selected");
 
-        if(selectedCount){
+        if (selectedCount) {
             container.select(".selected-color")
-                .attr("data-toggle","modal")
-                .attr("data-target","#annotation")
+                .attr("data-toggle", "modal")
+                .attr("data-target", "#annotation")
                 .html("<i class='fas fa-square fa-stack-2x'></i><i class='fas fa-edit fa-fw fa-stack-1x'></i>");
 
         }
-        else{
+        else {
             container.select(".selected-color")
-                .attr("data-toggle",null)
-                .attr("data-target",null)
+                .attr("data-toggle", null)
+                .attr("data-target", null)
                 .html("<i class='fas fa-square fa-stack-2x' />");
         }
 
@@ -132,6 +132,115 @@ transientTector.dashboardStateDescription = function (directorEvents) {
         return constructor;
     };
 
+    return constructor;
+};
+transientTector.annotationDownload = function (directorEvents) {
+    var notes = [];
+    var container;
+    var data;
+
+    /* https://halistechnology.com/2015/05/28/use-javascript-to-export-your-data-as-csv/ */
+    function convertArrayOfObjectsToCSV(args) {
+        var result, ctr, keys, columnDelimiter, lineDelimiter, data;
+
+        data = args.data || null;
+        if (data == null || !data.length) {
+            return null;
+        }
+
+        columnDelimiter = args.columnDelimiter || ',';
+        lineDelimiter = args.lineDelimiter || '\n';
+
+        keys = Object.keys(data[0]);
+
+        result = '';
+        result += keys.join(columnDelimiter);
+        result += lineDelimiter;
+
+        data.forEach(function (item) {
+            ctr = 0;
+            keys.forEach(function (key) {
+                if (ctr > 0) result += columnDelimiter;
+
+                result += item[key];
+                ctr++;
+            });
+            result += lineDelimiter;
+        });
+
+        return result;
+    }
+
+    function downloadCsv() {
+        var flattened_notes = _.flatten(_.map(notes, function (d) {
+            return _.map(d.timestamps, function (t) {
+                return {
+                    psn: d.psn,
+                    timestamp: transientTector.timeFormat(t),
+                    label: d.label,
+                    note: d.note
+                };
+            })
+        }));
+
+        var csv = convertArrayOfObjectsToCSV({
+            data: flattened_notes
+        });
+        if (csv == null) return;
+
+        var filename = 'export.csv';
+
+        if (!csv.match(/^data:text\/csv/i)) {
+            csv = 'data:text/csv;charset=utf-8,' + csv;
+        }
+        var encoded_data = encodeURI(csv);
+
+        var link = document.createElement('a');
+        link.setAttribute('href', encoded_data);
+        link.setAttribute('download', filename);
+        link.click();
+    }
+
+    function clearNotes() {
+        notes = [];
+        draw();
+    }
+
+    function draw() {
+        var save = container.select("#save");
+        var clear = container.select("#clear");
+
+        save.on("click", downloadCsv);
+        clear.on("click", clearNotes);
+
+        var count = _.reduce(_.map(notes, function (d) {
+            return d.timestamps.length;
+        }), function (a, b) {
+            return a + b;
+        }) || 0;
+        container.select("#note-stats")
+            .html(count + " data points verified");
+    }
+
+    function constructor(selection) {
+        selection.each(function (d) {
+            container = d3.select(this);
+            data = d;
+            draw();
+        });
+    }
+
+    constructor.dimensions = function (value) {
+        return constructor;
+    };
+    constructor.addNote = function (value) {
+        if (!arguments.length) {
+            return notes;
+        }
+        notes.push(value);
+        draw();
+        return constructor;
+    };
     return constructor;
 };
 transientTector.timePlot = function (directorEvents, dataKey) {
@@ -227,6 +336,9 @@ transientTector.timePlot = function (directorEvents, dataKey) {
     }
 
     function draw() {
+        if (!data) {
+            return;
+        }
         var yExtent = d3.extent(data.raw, function (d) {
             return d[dataKey];
         });
@@ -420,11 +532,26 @@ transientTector.timeSeries = function (directorEvents) {
     };
     var scales = {
         xDisplayed: d3.scaleTime(),
-        xFull: d3.scaleTime()
+        xFull: d3.scaleTime(),
+        eig: d3.scaleLinear()
     };
     var selectedTimestamps = [];
     var selectedStreaks = [];
     var selectedLabelTypes = [];
+    var selectedEigY;
+    var selectedEigX;
+    var sortBy = 'eigX';
+    var sortDir = -1;
+
+    function toggleSort(d) {
+        if (sortBy === d.key) {
+            sortDir *= -1;
+        }
+        else {
+            sortBy = d.key;
+        }
+        drawModal();
+    }
 
     function selectTimestamp() {
         var coord = d3.event.offsetX;
@@ -437,16 +564,17 @@ transientTector.timeSeries = function (directorEvents) {
         if (!rawPoint) {
             return;
         }
-        directorEvents.selectTimestamps([rawPoint.timestamp]);
+        selectedTimestamps.push(rawPoint.timestamp);
+        directorEvents.selectTimestamps(selectedTimestamps);
     }
 
     function rawFeatureSelect(d) {
-        if (rawPlots[d.field]) {
+        if (rawPlots[d.field.toLowerCase()]) {
             d3.select(this).attr("class", "dropdown-item");
-            delete rawPlots[d.field]
+            delete rawPlots[d.field.toLowerCase()]
         } else {
             d3.select(this).attr("class", "dropdown-item active");
-            rawPlots[d.field] = transientTector.timePlot(events, d.field);
+            rawPlots[d.field.toLowerCase()] = transientTector.timePlot(events, d.field.toLowerCase());
         }
         draw();
     }
@@ -529,6 +657,113 @@ transientTector.timeSeries = function (directorEvents) {
             .attr("transform", "rotate(-65)");
     }
 
+    function drawModal() {
+        var eigExtent = [
+            +_.min(_.min(data.eigenvalues, function (d) {
+                delete d['eigenvector'];
+                return _.min(d);
+            })),
+            +_.max(_.max(data.eigenvalues, function (d) {
+                delete d['eigenvector'];
+                return _.max(d);
+            }))
+        ];
+        scales.eig.domain(eigExtent);
+        scales.eig.range([0, (dimensions.width * 0.85) / 7]);
+
+        var fields = _.map(data.fields, function (d) {
+            var eigenvaluesX = data.eigenvalues[+selectedEigX.field.slice(-1)];
+            var eigenvalueX = +eigenvaluesX[d.field.toLowerCase()];
+
+            var eigenvaluesY = data.eigenvalues[+selectedEigY.field.slice(-1)];
+            var eigenvalueY = +eigenvaluesY[d.field.toLowerCase()];
+            var field = "<td>" + d.field + "</td>",
+                subsystem = "<td>" + d.subsystem + "</td>",
+                measurementType = "<td>" + d.measurement_type + "</td>",
+                eigA = "<td><div class='eig-value' style='width:" + (scales.eig(eigenvalueX) || 0) + "px;'></div></td>",
+                eigB = "<td><div class='eig-value' style='width:" + (scales.eig(eigenvalueY) || 0) + "px;'></div></td>",
+                description = "<td>" + d.description + "</td>"
+            d.eigX = eigenvalueX;
+            d.eigY = eigenvalueY;
+            d.rowHtml =field + subsystem + measurementType + eigA + eigB + description;
+            return d;
+        });
+
+        var eigenHtml = fields.sort(function (a, b) {
+            if(["eigX", "eigY"].indexOf(sortBy) > -1) {
+                return sortDir > 0 ? b[sortBy] - a[sortBy] : a[sortBy] - b[sortBy];
+            }
+            else
+            {
+                return sortDir > 0 ? a[sortBy].localeCompare(b[sortBy]) : b[sortBy].localeCompare(a[sortBy]);
+            }
+        });
+
+        var rows = container.select("#raw-feature-modal")
+            .select("#tag-table")
+            .select("tbody")
+            .selectAll("tr")
+            .data(eigenHtml);
+
+        rows.enter().append("tr")
+            .merge(rows)
+            .attr("class", function (d) {
+                return rawPlots[d.field] ? "machine-tag active" : "machine-tag";
+            })
+            .html(function (d) {
+                return d.rowHtml;
+            })
+            .on("click", rawFeatureSelect);
+
+        rows.exit().remove();
+
+        var headerRows = container.select("#raw-feature-modal")
+            .select("#tag-table")
+            .select("thead")
+            .select("tr")
+            .selectAll("td")
+            .data([
+                {
+                    display: "Tag",
+                    key: "field"
+                },
+                {
+                    display: "Subsystem",
+                    key: "subsystem"
+                },
+                {
+                    display: "Measurement Type",
+                    key: "measurement_type"
+                },
+                {
+                    display: selectedEigX.name + " Influenece",
+                    key: "eigX"
+                },
+                {
+                    display: selectedEigY.name + " Influenece",
+                    key: "eigY"
+                },
+                {
+                    display: "Description",
+                    key: "description"
+                }
+            ]);
+
+        headerRows.enter().append("td")
+            .merge(headerRows)
+            .html(function (d) {
+                return d.display;
+            })
+            .on("click", toggleSort);
+
+        headerRows.exit().remove();
+
+        container.select("#raw-feature-modal").select(".plot")
+            .on("click", function (d) {
+                $("#raw-feature-modal").modal("hide");
+            });
+    }
+
     function draw() {
         if (!data.raw && !data.pca) {
             return;
@@ -537,6 +772,8 @@ transientTector.timeSeries = function (directorEvents) {
         var xExtent = d3.extent(data.raw, function (d) {
             return d.timestamp;
         });
+
+
         scales.xDisplayed.range([(dimensions.width * 0.05), dimensions.width]);
         scales.xFull.range([(dimensions.width * 0.05), dimensions.width]);
         scales.xDisplayed.domain(xExtent);
@@ -588,24 +825,7 @@ transientTector.timeSeries = function (directorEvents) {
             .attr("dy", ".15em")
             .attr("transform", "rotate(-65)");
 
-        var menuOptions = container.select(".raw-feature-selector")
-            .select(".dropdown-menu")
-            .selectAll(".dropdown-item")
-            .data(data.fields);
-
-        menuOptions.enter()
-            .append("a")
-            .attr("class", function (d) {
-                return rawPlots[d.field] ? "dropdown-item active" : "dropdown-item";
-            })
-            .attr("href", "#")
-            .on("click", rawFeatureSelect)
-            .merge(menuOptions)
-            .text(function (d) {
-                return d.field;
-            });
-
-        menuOptions.exit().remove();
+        drawModal();
 
         var menuOptions = container.select(".eigenvector-selector")
             .select(".dropdown-menu")
@@ -710,6 +930,21 @@ transientTector.timeSeries = function (directorEvents) {
         selectedLabelTypes = types;
         return constructor;
     };
+
+    constructor.selectedEigX = function (value) {
+        if (!arguments.length) {
+            return selectedEigX;
+        }
+        selectedEigX = value;
+        return constructor;
+    };
+    constructor.selectedEigY = function (value) {
+        if (!arguments.length) {
+            return selectedEigY;
+        }
+        selectedEigY = value;
+        return constructor;
+    };
     return constructor;
 };
 transientTector.reducedSpace = function (directorEvents) {
@@ -730,20 +965,24 @@ transientTector.reducedSpace = function (directorEvents) {
         x: "pca_eig0",
         y: "pca_eig1"
     }
-    var color = d3.scaleLinear().range(transientTector.colors.green)
+    var color = d3.scaleLinear().range(transientTector.colors.blue)
         .domain([0, 50]);
-    var selectedColor = d3.scaleLinear().range(transientTector.colors.blue)
+    var selectedColor = d3.scaleLinear().range(transientTector.colors.green)
         .domain([0, 50]);
     var transientColor = d3.scaleLinear().range(transientTector.colors.orange)
         .domain([0, 50]);
+    var zoomer = d3.zoom().scaleExtent([1, 10]).on("zoom", zoom);
+    var resetZoom = false;
 
     function xAxisSelect(d) {
         selectedAxes.x = d.field;
+        directorEvents.selectEigX(d);
         draw();
     }
 
     function yAxisSelect(d) {
         selectedAxes.y = d.field;
+        directorEvents.selectEigY(d);
         draw();
     }
 
@@ -774,6 +1013,13 @@ transientTector.reducedSpace = function (directorEvents) {
     }
 
     function drawHexBins() {
+        selectedLabelData = [];
+        if (data) {
+            selectedLabelData = _.map(data.mergedLabels, function (c) {
+                return c.timestamp.getTime();
+            });
+        }
+
         var hexbin = d3.hexbin()
             .x(function (d) {
                 return scales.xScale(d[selectedAxes.x]);
@@ -809,10 +1055,6 @@ transientTector.reducedSpace = function (directorEvents) {
                 );
 
                 directorEvents.selectTimestamps(timestamps);
-            })
-            .on("contextmenu", function (d, i) {
-                d3.event.preventDefault();
-                directorEvents.selectTimestamps([]);
             })
             .on("mouseover", hover)
             .on("mouseout", function () {
@@ -854,30 +1096,21 @@ transientTector.reducedSpace = function (directorEvents) {
 
     }
 
-    function labelTypeSelect(d) {
-        if (d3.select(this).attr("class").indexOf("active") > -1) {
-            d3.select(this).attr("class", "dropdown-item");
-            selectedLabelData = [];
-
-        } else {
-            d3.select(this).attr("class", "dropdown-item active");
-            selectedLabelData = _.map(_.pluck(data[d.dataKey], "timestamp"), function (d) {
-                return d.getTime()
-            });
-        }
-        draw();
-    }
-
     function draw() {
         var filteredData = data.pca;
         if (!filteredData) {
             return;
         }
-
+        if (resetZoom) {
+            container.selectAll(".hexagon")
+                .attr("transform", d3.zoomIdentity);
+            container.select("svg.scatter")
+                .call(zoomer.transform, d3.zoomIdentity);
+        }
         container.select("svg.scatter")
             .attr("height", dimensions.height)
             .attr("width", dimensions.width)
-            .call(d3.zoom().scaleExtent([1, 10]).on("zoom", zoom));
+            .call(zoomer);
         var yExtent = d3.extent(_.map(_.pluck(filteredData, "pca_eig1"), function (d) {
             return parseFloat(d);
         }));
@@ -955,7 +1188,11 @@ transientTector.reducedSpace = function (directorEvents) {
         if (!arguments.length) {
             return selectedPsn;
         }
+        if (selectedPsn) {
+            resetZoom = true;
+        }
         selectedPsn = value;
+
         return constructor;
     };
     constructor.selectTimestamps = function (value) {
@@ -971,15 +1208,8 @@ transientTector.reducedSpace = function (directorEvents) {
             return selectedLabelTypes;
         }
         selectedLabelTypes = types;
-        selectedLabelData = [];
-        selectedLabelData = _.union(_.flatten(
-            _.map(
-                selectedLabelTypes,
-                function (d) {
-                    return _.map(data[d.dataKey], function (c) {
-                        return c.timestamp.getTime();
-                    });
-                })));
+
+
         return constructor;
     };
     return constructor;
@@ -995,6 +1225,7 @@ transientTector.stats = function (directorEvents) {
     };
     var selectedTimestamps = [];
     var selectedClusters = [];
+    var selectedPsn;
 
     function draw() {
         var clusterData = getStatsForMembership(memberOf());
@@ -1120,7 +1351,41 @@ transientTector.stats = function (directorEvents) {
             else {
                 return "";
             }
-        })
+        });
+        var packageSimilarity = _.find(data.packageSimilarity, function (s) {
+            return s.psn === selectedPsn;
+        });
+        var sortable = [];
+        for (var related in packageSimilarity) {
+            if (related === selectedPsn) {
+                continue;
+            }
+
+            sortable.push([related, packageSimilarity[related]]);
+        }
+
+        sortable.sort(function (a, b) {
+            return a[1] - b[1];
+        });
+        sortable = sortable.slice(0, 5);
+
+        var similarity = container.select("#package-similarity").selectAll("a")
+            .data(sortable);
+
+        similarity.enter()
+            .append("a")
+            .attr("class", "similar-link")
+            .merge(similarity)
+            .attr("href", "#")
+            .html(function (d) {
+                return d[0];
+            })
+            .on("click", function (d) {
+                directorEvents.selectPsn(d[0]);
+            });
+
+        similarity.exit().remove();
+
 
     }
 
@@ -1141,6 +1406,14 @@ transientTector.stats = function (directorEvents) {
             draw();
         });
     }
+
+    constructor.psn = function (value) {
+        if (!arguments.length) {
+            return selectedPsn;
+        }
+        selectedPsn = value;
+        return constructor;
+    };
 
     constructor.dimensions = function (value) {
         if (!arguments.length) {
@@ -1179,12 +1452,18 @@ transientTector.psnSelector = function (directorEvents) {
     var dimensions = {width: 0, height: 0, parentWidth: 0, parentHeight: 0};
     var container;
     var data;
+    var selectedPsn;
+
+    function updatePsnDisplay() {
+        if (selectedPsn) {
+            container.selectAll(".dropdown-item").attr("class", "dropdown-item");
+            d3.select(this).attr("class", "dropdown-item active");
+            container.select(".dropdown-toggle").text("PSN " + selectedPsn);
+        }
+    }
 
     function onSelect(d) {
         directorEvents.selectPsn(d.psn);
-        container.selectAll(".dropdown-item").attr("class", "dropdown-item");
-        d3.select(this).attr("class", "dropdown-item active");
-        container.select(".dropdown-toggle").text("PSN " + d.psn);
     }
 
     function draw() {
@@ -1204,6 +1483,7 @@ transientTector.psnSelector = function (directorEvents) {
             });
 
         menuOptions.exit().remove();
+        updatePsnDisplay();
     }
 
     function constructor(selection) {
@@ -1214,6 +1494,14 @@ transientTector.psnSelector = function (directorEvents) {
         });
     }
 
+    constructor.psn = function (value) {
+        if (!arguments.length) {
+            return selectedPsn;
+        }
+        selectedPsn = value;
+
+        return constructor;
+    };
     constructor.dimensions = function (value) {
         if (!arguments.length) {
             return dimensions;
@@ -1224,6 +1512,7 @@ transientTector.psnSelector = function (directorEvents) {
         dimensions.parentHeight = value.height;
         return constructor;
     };
+
     return constructor;
 };
 
@@ -1240,7 +1529,8 @@ transientTector.director = function () {
         stats: transientTector.stats(events),
         reducedSpace: transientTector.reducedSpace(events),
         timeSeries: transientTector.timeSeries(events),
-        dashboardState: transientTector.dashboardStateDescription(events)
+        dashboardState: transientTector.dashboardStateDescription(events),
+        noteDownload: transientTector.annotationDownload(events)
     };
     var labelTypes = [
         {
@@ -1254,24 +1544,36 @@ transientTector.director = function () {
         {
             display: "Power Jump",
             dataKey: "powerStepLabels"
-        }];
+        },
+        {
+            display: "HDBScan Outliers",
+            dataKey: "hdbscanLabels"
+        }
+    ];
     var selectedTimestamps = [];
     var selectedLabelTypes = [];
     var selectedPsn;
+    var selectedEigX;
+    var selectedEigY;
+
     function draw() {
+        container.on("contextmenu", function (d, i) {
+            d3.event.preventDefault();
+            events.selectTimestamps([]);
+        });
+
         container.select("#stats")
             .datum({
                 clusterStats: data.clusterStats,
                 clusterDistributions: data.clusterDistributions,
-                clusterLabels: data.clusterLabels
+                clusterLabels: data.clusterLabels,
+                packageSimilarity: data.packageSimilarity
             })
-            .call(components.stats);
-        container.select("#psn-selector").datum(data.psn).call(components.psnSelector);
+            .call(components.stats.psn(selectedPsn));
+        container.select("#psn-selector").datum(data.psn).call(components.psnSelector.psn(selectedPsn));
         container.select("#reduced-space").datum({
             pca: data.pca,
-            kinkLabels: data.kinkLabels,
-            powerStepLabels: data.powerStepLabels,
-            stepSizeLabels: data.stepSizeLabels,
+            mergedLabels: data.mergedLabels,
             compositeFields: data.compositeFields
         }).call(components.reducedSpace.selectedLabelTypes(selectedLabelTypes));
         container.select("#timeseries").datum({
@@ -1281,14 +1583,22 @@ transientTector.director = function () {
             kinkLabels: data.kinkLabels,
             powerStepLabels: data.powerStepLabels,
             stepSizeLabels: data.stepSizeLabels,
+            hdbscanLabels: data.hdbscanLabels,
             fields: data.fields,
-            compositeFields: data.compositeFields
-        }).call(components.timeSeries.selectedLabelTypes(selectedLabelTypes));
+            compositeFields: data.compositeFields,
+            eigenvalues: data.eigenvalues
+        }).call(components.timeSeries
+            .selectedLabelTypes(selectedLabelTypes)
+            .selectedEigX(selectedEigX)
+            .selectedEigY(selectedEigY)
+        );
+
         container.select(".dashboard-state-description")
             .datum({
                 pca: data.pca,
                 mergedLabels: data.mergedLabels
             }).call(components.dashboardState.selectedLabelTypes(selectedLabelTypes));
+        container.select("#note-download").call(components.noteDownload);
 
         var menuOptions = container.select("#metric-selector")
             .select(".dropdown-menu");
@@ -1311,28 +1621,80 @@ transientTector.director = function () {
         menuOptions.exit().remove();
     }
 
-    function deferredDraw(error,
-                          raw,
-                          pca,
-                          kinkLabels,
-                          clusterLabels,
-                          powerStepLabels,
-                          stepSizeLabels,
-                          clusterDistributions,
-                          hdbscan) {
+    function getMergedTransientLabels() {
+        var kinkDates = _.find(selectedLabelTypes, function (c) {
+            return c.dataKey === "kinkLabels"
+        })
+            ? _.map(data.kinkLabels, function (d) {
+                return d.timestamp.getTime();
+            })
+            : [];
+        var powerDates = _.find(selectedLabelTypes, function (c) {
+            return c.dataKey === "powerStepLabels"
+        })
+            ? _.map(data.powerStepLabels, function (d) {
+                return d.timestamp.getTime();
+            })
+            : [];
+        var stepDates = _.find(selectedLabelTypes, function (c) {
+            return c.dataKey === "stepSizeLabels"
+        })
+            ? _.map(data.stepSizeLabels, function (d) {
+                return d.timestamp.getTime();
+            })
+            : [];
+
+        var hdbscanDates = _.find(selectedLabelTypes, function (c) {
+            return c.dataKey === "hdbscanLabels";
+        })
+            ? _.map(data.hdbscanLabels, function (d) {
+                return d.timestamp.getTime();
+            })
+            : [];
+
+        var dates = _.union(kinkDates, powerDates, stepDates, hdbscanDates);
+        var timeParse = d3.timeParse("%Q");
+        return _.map(dates, function (d) {
+            var hasKink = _.contains(kinkDates, d) ? 1 : 0;
+            var hasPower = _.contains(powerDates, d) ? 1 : 0;
+            var hasStep = _.contains(stepDates, d) ? 1 : 0;
+            var hasHdbscan = _.contains(hdbscanDates, d) ? 1 : 0;
+            return {
+                timestamp: timeParse(d),
+                kink: hasKink,
+                powerStep: hasPower,
+                stepSize: hasStep,
+                hdbscan: hasHdbscan
+            }
+        });
+    }
+
+    function updatePsnData(error,
+                           raw,
+                           pca,
+                           kinkLabels,
+                           clusterLabels,
+                           powerStepLabels,
+                           stepSizeLabels,
+                           clusterDistributions,
+                           hdbscan) {
         data.raw = raw;
         data.pca = pca;
         data.kinkLabels = kinkLabels;
         data.clusterLabels = clusterLabels;
         data.clusterDistributions = clusterDistributions;
-
+        data.hdbscanLabels = hdbscan;
         data.powerStepLabels = powerStepLabels;
         data.stepSizeLabels = stepSizeLabels;
 
         data.raw.forEach(function (d) {
             d.timestamp = transientTector.timeParse(d.timestamp);
             for (var i in data.fields) {
-                d[data.fields[i].field] = +d[data.fields[i].field];
+                var field = data.fields[i].field;
+                if (field && field != 'TIMESTAMP') {
+                    d[field.toLowerCase()] = +d[field.toLowerCase()];
+                }
+
             }
         });
         data.pca.forEach(function (d) {
@@ -1355,6 +1717,9 @@ transientTector.director = function () {
         data.clusterLabels.forEach(function (d) {
             d.timestamp = transientTector.timeParse(d.timestamp);
         });
+        data.hdbscanLabels.forEach(function (d) {
+            d.timestamp = transientTector.timeParse(d.timestamp);
+        });
         data.powerStepLabels.forEach(function (d) {
             d.timestamp = transientTector.timeParse(d.timestamp);
         });
@@ -1373,13 +1738,31 @@ transientTector.director = function () {
                 d[labelCols[i]] = +d[labelCols[i]];
             }
         });
+        data.packageSimilarity.forEach(function (d) {
+            for (var i in data.psn) {
+                d[data.psn[i].psn] = +d[data.psn[i].psn];
+            }
+        });
+
+        /*data.eigenvalues.forEach(function (d) {
+            for (var i in data.fields) {
+                var field = data.fields[i].field;
+                if (field && field != 'TIMESTAMP') {
+                    d[field.toLowerCase()] = +d[field.toLowerCase()];
+                }
+
+            }
+        });*/
+        data.mergedLabels = getMergedTransientLabels();
+
+        events.selectTimestamps([]);
         draw();
     }
 
     events.selectPsn = function (psn) {
         selectedPsn = psn;
-
         components.reducedSpace.psn(psn);
+
         d3.queue()
             .defer(d3.csv, "data/model2_preprocessed_data_psn" + psn + ".csv")
             .defer(d3.csv, "data/model2_pca_ncomponents5_psn" + psn + ".csv")
@@ -1389,10 +1772,18 @@ transientTector.director = function () {
             .defer(d3.csv, "data/model2_pca_stepsize_psn" + psn + ".csv")
             .defer(d3.csv, "data/model2_20min_cluster_distributions_psn" + psn + ".csv")
             .defer(d3.csv, "data/model2_hdbscan_psn" + psn + ".csv")
-            .await(deferredDraw);
+            .await(updatePsnData);
 
         return psn;
     };
+    events.selectEigX = function (field) {
+        selectedEigX = field;
+        draw();
+    }
+    events.selectEigY = function (field) {
+        selectedEigY = field;
+        draw();
+    }
     events.selectTimestamps = function (timestamps) {
         selectedTimestamps = timestamps;
 
@@ -1408,65 +1799,35 @@ transientTector.director = function () {
         else {
             selectedLabelTypes.push(type);
         }
-
-        var kinkDates = _.find(selectedLabelTypes, function (c) {
-            return c.dataKey === "kinkLabels"
-        })
-            ? _.map(data.kinkLabels, function (d) {
-                return d.timestamp.getTime();
-            })
-            : [];
-        var powerDates = _.find(selectedLabelTypes, function (c) {
-            return c.dataKey === "powerStepLabels"
-        })
-            ? _.map(data.powerStepLabels, function (d) {
-                return d.timestamp.getTime();
-            })
-            : [];
-        var stepDates = _.find(selectedLabelTypes, function (c) {
-            return c.dataKey === "stepSizeLabels"
-        })
-            ? _.map(data.stepSizeLabels, function (d) {
-                return d.timestamp.getTime();
-            })
-            : [];
-        var dates = _.union(kinkDates, powerDates, stepDates);
-        var timeParse = d3.timeParse("%Q");
-        data.mergedLabels = _.map(dates, function (d) {
-            var hasKink = _.contains(kinkDates, d) ? 1 : 0;
-            var hasPower = _.contains(powerDates, d) ? 1 : 0;
-            var hasStep = _.contains(stepDates, d) ? 1 : 0;
-            return {
-                timestamp: timeParse(d),
-                kink: hasKink,
-                powerStep: hasPower,
-                stepSize: hasStep,
-                hdbscan: 0
-            }
-        });
-
+        data.mergedLabels = getMergedTransientLabels();
 
         draw();
     };
-    events.addNote = function(){
-        var annotation = d3.select("#annotation")
+    events.addNote = function () {
+        var annotation = d3.select("#annotation");
         var label = annotation.select("#transient-select").property("value");
         var note = annotation.select("#data-notes").property("value");
 
-        notes.push({
-            psn:selectedPsn,
+        var noteRecord = {
+            psn: selectedPsn,
             timestamps: selectedTimestamps,
             label: label,
-            note:note
-        });
+            note: note
+        };
+        notes.push(noteRecord);
+        components.noteDownload.addNote(noteRecord);
+
         $("#annotation").modal("hide");
         document.getElementById("transient-select").value = "Not Transient";
         document.getElementById("data-notes").value = "";
-    }
+    };
+
     function constructor(selection) {
         selection.each(function (d) {
             container = d3.select(this);
             data = d;
+            selectedEigX = data.compositeFields[0];
+            selectedEigY = data.compositeFields[1];
             draw();
         });
     }

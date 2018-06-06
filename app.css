@@ -30,12 +30,12 @@ h1,h2,h4,h5{
 }
 
 .transient-label{
-    fill:#B16000;
+    fill:#F38400;
     opacity: .9;
 }
 
 .timespan{
-    fill:#037798;
+    fill:#597203;
 
 }
 
@@ -53,7 +53,7 @@ h1,h2,h4,h5{
     fill:#037798;
 }
 .mean{
-    stroke:#FF9D8E;
+    stroke:#E1E1E1;
     stroke-width:1px;
 }
 
@@ -72,11 +72,11 @@ rect.cluster-border{
 
 }
 rect.cluster-border.active{
-    stroke:#037798;
+    stroke:#86A322;
     stroke-width: 2;
 }
 .data-color .fa-square{
-    color: #86A322;
+    color: #0DA3CE;
 }
 
 .transient-color .fa-square{
@@ -84,5 +84,27 @@ rect.cluster-border.active{
 }
 
 .selected-color .fa-square{
-    color: #0DA3CE;
+    color: #86A322;
+}
+
+.button-color .fa-square{
+    color: #6A6C6E;
+}
+
+.similar-link{
+    margin:0px 2px;
+}
+
+#raw-feature-modal .modal-dialog{
+    width:85%;
+    max-width:85%;
+}
+.eig-value{
+    background-color: #885692;
+    border:1px solid #B894BF;
+    height:15px;
+}
+#tag-table{
+    text-transform:capitalize;
+    color:#6A6C6E;
 }

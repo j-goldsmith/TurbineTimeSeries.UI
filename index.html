@@ -55,7 +55,7 @@
         </div>
     </div>
     <div class="row dashboard-state-description">
-        <div class="col-md-4 text-right">
+        <div class="col-md-3 text-center">
             <span id="data-count">
             0 data points across 0 days
             </span>
@@ -63,7 +63,7 @@
                 <i class='fas fa-square fa-stack-2x'> </i>
             </span>
         </div>
-        <div class="col-md-4 text-center transient-stats">
+        <div class="col-md-3 text-center transient-stats">
             <span id="transient-count">
             0 labeled transients
             </span>
@@ -72,12 +72,23 @@
             </span>
 
         </div>
-        <div class="col-md-4 text-left">
+        <div class="col-md-3 text-center">
             <span id="selected-count">
             0 data points selected
             </span>
             <span class="selected-color fa-stack" >
                 <i class='fas fa-square fa-stack-2x'> </i>
+            </span>
+        </div>
+        <div class="col-md-3 text-center" id="note-download">
+            <span id="note-stats"></span>
+            <span class="fa-stack button-color" id="save" >
+                <i class='fas fa-square fa-stack-2x'> </i>
+                <i class='fas fa-save fa-stack-1x'> </i>
+            </span>
+            <span class="fa-stack button-color" id="clear" >
+                <i class='fas fa-square fa-stack-2x'> </i>
+                <i class='fas fa-trash fa-stack-1x'> </i>
             </span>
         </div>
         <div id="annotation" class="modal" role="dialog">
@@ -155,7 +166,7 @@
                         </div>
                     </div>
                     <div class="btn-group raw-feature-selector">
-                        <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-toggle="modal" data-target="#raw-feature-modal" aria-haspopup="true" aria-expanded="false">
                             Machine Tags
                         </button>
                         <div class="dropdown-menu">
@@ -175,11 +186,47 @@
                     <g class="xaxis"></g>
                 </svg>
             </div>
+            <div id="raw-feature-modal" class="modal" role="dialog">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Tags to Plot</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body" >
+                            <table id="tag-table">
+                                <thead>
+                                    <tr>
+                                        <td>Tag</td>
+                                        <td>Subsystem</td>
+                                        <td>Measurement Type</td>
+                                        <td id="eigX-label"></td>
+                                        <td id="eigY-label"></td>
+                                        <td>Tag Description</td>
+                                    </tr>
+                                </thead>
+                                <tbody>
+
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary plot">Plot</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     <div class="row">
         <div id="stats" class="col text-center">
             <h4>Operating Load Profiles</h4>
+            <div>
+                Similar packages: <span id="package-similarity"></span>
+            </div>
+
             <div id="cluster-breakdown"></div>
         </div>
     </div>
@@ -192,9 +239,11 @@
             .defer(d3.csv, "data/model2_composite_fields.csv")
             .defer(d3.csv, "data/metrics.csv")
             .defer(d3.csv, "data/model2_20min_partition_cluster_stats.csv")
+            .defer(d3.csv, "data/model2_20min_cluster_similarity.csv")
+            .defer(d3.csv, "data/model2_eigenvalues.csv")
             .await(init);
 
-        function init(error, psn, fields,compositeFields, metrics, clusterStats) {
+        function init(error, psn, fields,compositeFields, metrics, clusterStats,packageSimilarity, eigenvalues) {
             if (error) {
                 console.log(error);
             }
@@ -210,7 +259,9 @@
                     fields: fields,
                     compositeFields: compositeFields,
                     metrics: metrics,
-                    clusterStats:clusterStats
+                    clusterStats:clusterStats,
+                    packageSimilarity:packageSimilarity,
+                    eigenvalues:eigenvalues
                 })
                 .call(dashboard);
         }
