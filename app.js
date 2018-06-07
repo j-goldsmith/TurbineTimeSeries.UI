@@ -1056,7 +1056,7 @@ transientTector.reducedSpace = function (directorEvents) {
             })
             .radius(8 / zoomK);
 
-        var hexBinData = hexbin(data.pca)
+        var hexBinData = hexbin(data.pca);
         var points = container
             .select("svg.scatter")
             .select("g.hex")
@@ -1107,20 +1107,14 @@ transientTector.reducedSpace = function (directorEvents) {
                 return d.getTime();
             });
 
-            var selected = _.intersection(selectedTime, binnedTimestamps).length > 0 ? true : false;
-            var hasTransient = _.intersection(selectedLabelData, binnedTimestamps).length > 0 ? true : false;
+            d.isSelected = _.intersection(selectedTime, binnedTimestamps).length > 0 ? true : false;
+            d.hasTransient = _.intersection(selectedLabelData, binnedTimestamps).length > 0 ? true : false;
 
-            return {
-                length: d.length,
-                x: d.x,
-                y: d.y,
-                hasTransient: hasTransient,
-                isSelected: selected
-            }
+            return d;
         }), function(d){return d.hasTransient || d.isSelected;});
         var selectedCircles = container
             .select("svg.scatter")
-            .select("g.hex")
+            .select("g.circles")
             .selectAll("circle.selected")
             .data(circleData);
         selectedCircles.enter()
@@ -1159,7 +1153,7 @@ transientTector.reducedSpace = function (directorEvents) {
 
         var transientCircles = container
             .select("svg.scatter")
-            .select("g.hex")
+            .select("g.circles")
             .selectAll("circle.transient")
             .data(circleData);
         transientCircles.enter()
@@ -1186,7 +1180,7 @@ transientTector.reducedSpace = function (directorEvents) {
             })
             .attr("r", function (d) {
                 if (d.hasTransient) {
-                    return 3 / zoomK;
+                    return 3 / zoomK > .3 ? 3 / zoomK:.31;
                 }
                 else {
                     return 0
@@ -1237,7 +1231,8 @@ transientTector.reducedSpace = function (directorEvents) {
         drawHexBins();
         container.select(".hex")
             .attr("transform", d3.event.transform);
-
+        container.select(".circles")
+            .attr("transform", d3.event.transform);
         scales.xScale.domain(t.rescaleX(scales.xFull).domain());
         scales.yScale.domain(t.rescaleY(scales.yFull).domain());
         drawAxes();
