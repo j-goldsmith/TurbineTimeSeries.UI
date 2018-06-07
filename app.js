@@ -10,11 +10,7 @@ transientTector.timeParse = d3.timeParse("%Y-%m-%d %H:%M:%S");
 transientTector.timeFormat = d3.timeFormat("%Y-%m-%d %H:%M");
 transientTector.colors = {
     blue: [
-        '#7DD0E7',
-        '#3FB6D8',
-        '#0DA3CE',
-        '#037798',
-        '#024F65'
+        '#7dd0e7','#60c2df','#41b4d7','#19a5cf','#0a96be','#0787ac','#057899','#036b88','#025c76','#024f65'
     ],
     red: [
         '#FF9D8E',
@@ -131,7 +127,10 @@ transientTector.dashboardStateDescription = function (directorEvents) {
         dimensions.parentHeight = value.height;
         return constructor;
     };
-
+    constructor.updateMergedLabels = function (value) {
+        data.mergedLabels = value;
+        draw();
+    };
     return constructor;
 };
 transientTector.annotationDownload = function (directorEvents) {
@@ -254,7 +253,7 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         y: d3.scaleLinear()
     };
     var axes = {
-        y: d3.axisLeft(scales.y)
+        y: d3.axisLeft(scales.y).ticks(3)
     };
     var plotLine = d3.line()
         .x(function (d) {
@@ -335,6 +334,30 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         selectedRanges.exit().remove();
     }
 
+    function drawLabels() {
+        var labels = container
+            .select("g.transient-labels")
+            .selectAll("rect.transient-label")
+            .data(data.labelStreaks);
+
+        labels.enter()
+            .append("rect")
+            .attr("class", "transient-label")
+            .merge(labels)
+            .attr("x", function (d) {
+                return scales.xDisplayed(moment(d[0]).subtract(5, 'minutes'));
+            })
+            .attr("y", dimensions.highlightHeight)
+            .attr("width", function (d) {
+                var width = Math.abs(scales.xDisplayed(moment(d[1]).add(5, 'minutes')) -
+                    scales.xDisplayed(moment(d[0]).subtract(5, 'minutes')));
+                return width > 1 ? width : 1;
+            })
+            .attr("height", dimensions.yHeight);
+
+        labels.exit().remove();
+    }
+
     function draw() {
         if (!data) {
             return;
@@ -365,27 +388,7 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         var pointWidth = scales.xDisplayed(now) - scales.xDisplayed(now.subtract(10, 'minutes'));
         pointWidth = pointWidth > 1 ? pointWidth : 1;
 
-        var labels = container
-            .select("g.transient-labels")
-            .selectAll("rect.transient-label")
-            .data(data.labelStreaks);
-
-        labels.enter()
-            .append("rect")
-            .attr("class", "transient-label")
-            .merge(labels)
-            .attr("x", function (d) {
-                return scales.xDisplayed(moment(d[0]).subtract(5, 'minutes'));
-            })
-            .attr("y", dimensions.highlightHeight)
-            .attr("width", function (d) {
-                var width = Math.abs(scales.xDisplayed(moment(d[1]).add(5, 'minutes')) -
-                    scales.xDisplayed(moment(d[0]).subtract(5, 'minutes')));
-                return width > 1 ? width : 1;
-            })
-            .attr("height", dimensions.yHeight);
-
-        labels.exit().remove();
+        drawLabels();
 
         var selectedRanges = container
             .select("g.selected-timespans")
@@ -514,6 +517,11 @@ transientTector.timePlot = function (directorEvents, dataKey) {
 
         return constructor;
     };
+    constructor.updateLabels = function (value) {
+        data.labelStreaks = value;
+        drawLabels();
+        return constructor;
+    };
     return constructor;
 };
 transientTector.timeSeries = function (directorEvents) {
@@ -541,7 +549,7 @@ transientTector.timeSeries = function (directorEvents) {
     var selectedEigY;
     var selectedEigX;
     var sortBy = 'eigX';
-    var sortDir = -1;
+    var sortDir = 1;
 
     function toggleSort(d) {
         if (sortBy === d.key) {
@@ -685,16 +693,19 @@ transientTector.timeSeries = function (directorEvents) {
                 description = "<td>" + d.description + "</td>"
             d.eigX = eigenvalueX;
             d.eigY = eigenvalueY;
-            d.rowHtml =field + subsystem + measurementType + eigA + eigB + description;
+            d.rowHtml = field + subsystem + measurementType + eigA + eigB + description;
             return d;
         });
 
         var eigenHtml = fields.sort(function (a, b) {
-            if(["eigX", "eigY"].indexOf(sortBy) > -1) {
-                return sortDir > 0 ? b[sortBy] - a[sortBy] : a[sortBy] - b[sortBy];
+            if (["eigX", "eigY"].indexOf(sortBy) > -1) {
+                //float comparison
+                var bVal = b[sortBy] || -999;
+                var aVal = a[sortBy] || -999;
+                return sortDir > 0 ? bVal - aVal : aVal - bVal;
             }
-            else
-            {
+            else {
+                //string comparison
                 return sortDir > 0 ? a[sortBy].localeCompare(b[sortBy]) : b[sortBy].localeCompare(a[sortBy]);
             }
         });
@@ -708,7 +719,7 @@ transientTector.timeSeries = function (directorEvents) {
         rows.enter().append("tr")
             .merge(rows)
             .attr("class", function (d) {
-                return rawPlots[d.field] ? "machine-tag active" : "machine-tag";
+                return rawPlots[d.field.toLowerCase()] ? "machine-tag table-active" : "machine-tag";
             })
             .html(function (d) {
                 return d.rowHtml;
@@ -855,6 +866,8 @@ transientTector.timeSeries = function (directorEvents) {
                     labelStreaks: mergedStreaks
                 })
                 .call(eigenPlots[key].xScale(scales.xDisplayed).dimensions(dimensions));
+
+            eigenPlots[key].selectTimespans(selectedStreaks);
         }
         for (var key in rawPlots) {
             container.selectAll("div.raw-plot." + key)
@@ -864,6 +877,8 @@ transientTector.timeSeries = function (directorEvents) {
                     labelStreaks: mergedStreaks
                 })
                 .call(rawPlots[key].xScale(scales.xDisplayed).dimensions(dimensions));
+
+            rawPlots[key].selectTimespans(selectedStreaks);
         }
 
     }
@@ -902,7 +917,7 @@ transientTector.timeSeries = function (directorEvents) {
             return dimensions;
         }
         dimensions.width = (value.width / 2);
-        dimensions.height = value.height * 0.65;
+        dimensions.height = value.height * 0.64;
         dimensions.parentWidth = value.width;
         dimensions.parentHeight = value.height;
         return constructor;
@@ -930,7 +945,16 @@ transientTector.timeSeries = function (directorEvents) {
         selectedLabelTypes = types;
         return constructor;
     };
-
+    constructor.updateMergedLabels = function (value) {
+        data.mergedLabels = value;
+        var streaks = getStreaks(_.pluck(data.mergedLabels, "timestamp").sort());
+        for (var key in eigenPlots) {
+            eigenPlots[key].updateLabels(streaks);
+        }
+        for (var key in rawPlots) {
+            rawPlots[key].updateLabels(streaks);
+        }
+    };
     constructor.selectedEigX = function (value) {
         if (!arguments.length) {
             return selectedEigX;
@@ -955,33 +979,38 @@ transientTector.reducedSpace = function (directorEvents) {
     var selectedPsn = null;
     var scales = {
         xScale: d3.scaleLinear(),
-        yScale: d3.scaleLinear()
+        yScale: d3.scaleLinear(),
+
+        xFull: d3.scaleLinear(),
+        yFull: d3.scaleLinear()
+    };
+    var axes = {
+        y: d3.axisLeft(scales.yScale),
+        x: d3.axisBottom(scales.xScale)
     };
     var zoomK = 1;
     var selectedTimestamps = [];
     var selectedLabelTypes = [];
     var selectedLabelData = [];
     var selectedAxes = {
-        x: "pca_eig0",
-        y: "pca_eig1"
+
     }
-    var color = d3.scaleLinear().range(transientTector.colors.blue)
-        .domain([0, 50]);
-    var selectedColor = d3.scaleLinear().range(transientTector.colors.green)
-        .domain([0, 50]);
-    var transientColor = d3.scaleLinear().range(transientTector.colors.orange)
-        .domain([0, 50]);
-    var zoomer = d3.zoom().scaleExtent([1, 10]).on("zoom", zoom);
+
+    var color = d3.scaleThreshold().domain([10,20,30,40,50,60,70,80,90]).range(transientTector.colors.blue);
+    var selectedColor = d3.scaleThreshold().domain([10,20,30,40,50,60,70,80,90]).range(transientTector.colors.green);
+    var transientColor = d3.scaleThreshold().domain([10,20,30,40,50,60,70,80,90]).range(transientTector.colors.orange);
+
+    var zoomer = d3.zoom().scaleExtent([.8, 10]).on("zoom", zoom);
     var resetZoom = false;
 
     function xAxisSelect(d) {
-        selectedAxes.x = d.field;
+        selectedAxes.x = d;
         directorEvents.selectEigX(d);
         draw();
     }
 
     function yAxisSelect(d) {
-        selectedAxes.y = d.field;
+        selectedAxes.y = d;
         directorEvents.selectEigY(d);
         draw();
     }
@@ -1022,19 +1051,21 @@ transientTector.reducedSpace = function (directorEvents) {
 
         var hexbin = d3.hexbin()
             .x(function (d) {
-                return scales.xScale(d[selectedAxes.x]);
+                return scales.xFull(d[selectedAxes.x.field]);
             })
             .y(function (d) {
-                return scales.yScale(d[selectedAxes.y]);
+                return scales.yFull(d[selectedAxes.y.field]);
             })
-            .radius(8 / zoomK);
+            .radius(8 /zoomK);
 
+        var hexBinData = hexbin(data.pca)
         var points = container
             .select("svg.scatter")
+            .select("g.hex")
             .selectAll("path")
-            .data(hexbin(data.pca));
+            .data(hexBinData);
 
-        points.enter()
+       points.enter()
             .append("path")
             .attr("class", "hexagon")
             .on("click", function (d) {
@@ -1061,10 +1092,41 @@ transientTector.reducedSpace = function (directorEvents) {
                 d3.select("#timeseries-hover").attr("style", "display:none;");
             })
             .merge(points)
-            .attr("d", function (d) {
-                return "M" + d.x + "," + d.y + hexbin.hexagon();
+                .attr("d", function (d) {
+                    return "M" + d.x + "," + d.y + hexbin.hexagon();
+                })
+                .attr("fill", function (d) {
+
+                        return color(d.length);
+
+                });
+        points.exit().remove();
+
+        var selectedCircles = container
+            .select("svg.scatter")
+            .select("g.hex")
+            .selectAll("circle.selected")
+            .data(hexBinData);
+        selectedCircles.enter()
+            .append('circle')
+            .attr('class','selected')
+            .on("mouseover", hover)
+            .on("mouseout", function () {
+                d3.select("#timeseries-hover").attr("style", "display:none;");
             })
-            .attr("fill", function (d) {
+            .merge(selectedCircles)
+            .attr("cx",function(d){
+                var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (d) {
+                    return d.getTime()
+                });
+                var hasTransient = _.intersection(selectedLabelData, binnedTimestamps).length > 0 ? true : false;
+
+                return hasTransient ? d.x+(3/zoomK)*.5 : d.x;
+            })
+            .attr("cy",function(d){
+                return d.y;
+            })
+            .attr("fill",function(d){
                 var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (d) {
                     return d.getTime()
                 });
@@ -1076,23 +1138,132 @@ transientTector.reducedSpace = function (directorEvents) {
                 if (selected) {
                     return selectedColor(d.length);
                 }
+                else{
+                    return null;
+                }
+            })
+            .attr("r",function(d){
+                var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (d) {
+                    return d.getTime()
+                });
+                var selectedTime = _.map(selectedTimestamps, function (d) {
+                    return d.getTime();
+                });
+
+                var selected = _.intersection(selectedTime, binnedTimestamps).length > 0 ? true : false;
+                if (selected) {
+                    return 3/zoomK;
+                }
+                else{
+                    return 0;
+                }
+            });
+        selectedCircles.exit().remove();
+
+        var transientCircles = container
+            .select("svg.scatter")
+            .select("g.hex")
+            .selectAll("circle.transient")
+            .data(hexBinData);
+        transientCircles.enter()
+            .append('circle')
+            .attr('class','transient')
+            .on("mouseover", hover)
+            .on("mouseout", function () {
+                d3.select("#timeseries-hover").attr("style", "display:none;");
+            })
+            .merge(transientCircles)
+            .attr("cx",function(d){
+                var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (d) {
+                    return d.getTime()
+                });
+                var selectedTime = _.map(selectedTimestamps, function (d) {
+                    return d.getTime();
+                });
+                var selected = _.intersection(selectedTime, binnedTimestamps).length > 0 ? true : false;
+
+                return selected ? d.x-(3/zoomK)*.5 : d.x;
+            })
+            .attr("cy",function(d){
+                return d.y;
+            })
+            .attr("fill",function(d){
+                var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (d) {
+                    return d.getTime()
+                });
                 var hasTransient = _.intersection(selectedLabelData, binnedTimestamps).length > 0 ? true : false;
                 if (hasTransient) {
                     return transientColor(d.length);
                 }
-                else {
-                    return color(d.length);
+                else
+                {
+                    return null;
+                }
+            })
+            .attr("r",function(d){
+                var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (d) {
+                    return d.getTime()
+                });
+                var hasTransient = _.intersection(selectedLabelData, binnedTimestamps).length > 0 ? true : false;
+                if (hasTransient) {
+                    return 3/zoomK;
+                }
+                else
+                {
+                    return 0
                 }
             });
-        points.exit().remove();
+        transientCircles.exit().remove();
+
+    }
+
+    function drawAxes() {
+        //container.select(".xaxis").attr("height", dimensions.height * .15);
+        container.select("text.yaxis-label")
+            .attr("transform", "translate(" + (dimensions.width * 0.08) + ","+(dimensions.height / 2)+") rotate(-90)")
+            .style("text-anchor", "middle")
+            .style("fill","white")
+            .text(selectedAxes.y.name);
+
+        container.select("text.xaxis-label")
+            .attr("transform", "translate(" + (dimensions.width /2 ) + ","+(dimensions.height * .92)+")")
+            .style("text-anchor", "middle")
+            .style("fill","white")
+            .text(selectedAxes.x.name);
+
+        container.select("g.xaxis")
+            .call(axes.x)
+            .attr("transform", "translate(0," + (dimensions.height * 0.95) + ")")
+            .selectAll("text")
+            .style("text-anchor", "end")
+           // .attr("transform", "")
+            //.attr("transform", "rotate(-65)");
+
+        // container.select(".yaxis").attr("height", dimensions.height * .15);
+        container.select("g.yaxis")
+            .call(axes.y)
+            .attr("transform", "translate(" + (dimensions.width * 0.05) + ",0)")
+            .selectAll("text")
+            .style("text-anchor", "end")
+           // .attr("dy", ".15em")
+           ;
     }
 
     function zoom() {
-        zoomK = d3.event.transform.k;
+        //if ((d3.event.sourceEvent && d3.event.sourceEvent.type === "brush")) return; // ignore zoom-by-brush
+
+        var t = d3.event.transform;
+        zoomK = t.k;
 
         drawHexBins();
-        container.selectAll(".hexagon")
+        container.select(".hex")
             .attr("transform", d3.event.transform);
+
+        scales.xScale.domain(t.rescaleX(scales.xFull).domain());
+        scales.yScale.domain(t.rescaleY(scales.yFull).domain());
+        drawAxes();
+
+
 
     }
 
@@ -1102,10 +1273,15 @@ transientTector.reducedSpace = function (directorEvents) {
             return;
         }
         if (resetZoom) {
-            container.selectAll(".hexagon")
+            container.selectAll(".hex")
                 .attr("transform", d3.zoomIdentity);
             container.select("svg.scatter")
                 .call(zoomer.transform, d3.zoomIdentity);
+        }
+
+        if(!selectedAxes.x){
+            selectedAxes.x = data.compositeFields[0];
+            selectedAxes.y = data.compositeFields[1];
         }
         container.select("svg.scatter")
             .attr("height", dimensions.height)
@@ -1119,10 +1295,16 @@ transientTector.reducedSpace = function (directorEvents) {
         }));
 
         scales.xScale.domain(xExtent);
-        scales.xScale.range([10, dimensions.width - 10]);
+        scales.xScale.range([25, dimensions.width - 25]);
+        scales.xFull.domain(xExtent);
+        scales.xFull.range([25, dimensions.width - 25]);
 
         scales.yScale.domain(yExtent);
-        scales.yScale.range([dimensions.height - 10, 10]);
+        scales.yScale.range([dimensions.height - 25, 25]);
+
+        scales.yFull.domain(yExtent);
+        scales.yFull.range([dimensions.height - 25, 25]);
+
 
         var menuOptions = container.select(".x-selector")
             .select(".dropdown-menu")
@@ -1135,7 +1317,7 @@ transientTector.reducedSpace = function (directorEvents) {
             .on("click", xAxisSelect)
             .merge(menuOptions)
             .attr("class", function (d) {
-                return selectedAxes.x === d.field ? "dropdown-item active" : "dropdown-item";
+                return selectedAxes.x.field === d.field ? "dropdown-item active" : "dropdown-item";
             })
             .text(function (d) {
                 return d.name + " - " + d.variance_explained + "%";
@@ -1154,7 +1336,7 @@ transientTector.reducedSpace = function (directorEvents) {
             .on("click", yAxisSelect)
             .merge(menuOptions)
             .attr("class", function (d) {
-                return selectedAxes.y === d.field ? "dropdown-item active" : "dropdown-item";
+                return selectedAxes.y.field === d.field ? "dropdown-item active" : "dropdown-item";
             })
             .text(function (d) {
                 return d.name + " - " + d.variance_explained + "%";
@@ -1162,6 +1344,17 @@ transientTector.reducedSpace = function (directorEvents) {
 
         menuOptions.exit().remove();
 
+        container.select("g.legend")
+            .call(
+                d3.legendColor()
+                   // .labelFormat(d3.format("i"))
+                    .labels([1,10,20,30,40,50,60,70,80,'90+'])
+                    .orient('horizontal')
+                    //.labels(d3.legendHelpers.thresholdLabels)
+                    .scale(color).shapeWidth(25).title("Measurement Density")
+            )
+            .attr("transform", "translate("+dimensions.width * .65+","+dimensions.height*.05+")");
+        drawAxes();
         drawHexBins();
     }
 
@@ -1178,7 +1371,7 @@ transientTector.reducedSpace = function (directorEvents) {
             return dimensions;
         }
         dimensions.width = value.width / 2;
-        dimensions.height = value.height / 2;
+        dimensions.height = value.height *.5;
         dimensions.parentWidth = value.width;
         dimensions.parentHeight = value.height;
         return constructor;
@@ -1212,6 +1405,10 @@ transientTector.reducedSpace = function (directorEvents) {
 
         return constructor;
     };
+    constructor.updateMergedLabels = function (value) {
+        data.mergedLabels = value;
+        draw();
+    };
     return constructor;
 };
 transientTector.stats = function (directorEvents) {
@@ -1224,6 +1421,7 @@ transientTector.stats = function (directorEvents) {
         y: d3.scaleLinear()
     };
     var selectedTimestamps = [];
+    var adjacentToSelectedClusters = [];
     var selectedClusters = [];
     var selectedPsn;
 
@@ -1272,13 +1470,22 @@ transientTector.stats = function (directorEvents) {
                 return selectedClusters.indexOf(d.cluster_label) > -1 ? "cluster active" : "cluster";
             })
             .on("click", function (d) {
+                if (selectedClusters.indexOf(+d.cluster_label) == -1) {
+                    selectedClusters.push(+d.cluster_label);
+                }
+                else {
+                    selectedClusters.splice(selectedClusters.indexOf(+d.cluster_label), 1);
+                }
+
+
                 var timestamps = _.map(_.unique(_.map(_.filter(data.clusterLabels, function (c) {
-                    return c.cluster_label == d.cluster_label;
+                    return selectedClusters.indexOf(+c.cluster_label) > -1;
                 }), function (d) {
                     return d.timestamp.getTime();
                 })), function (d) {
                     return new Date(d);
                 });
+
                 directorEvents.selectTimestamps(timestamps);
             });
         var clusterSvg = clusterWrappers.append("svg");
@@ -1292,7 +1499,15 @@ transientTector.stats = function (directorEvents) {
             .attr("height", dimensions.height / 10)
             .attr("width", dimensions.height / 10)
             .attr("class", function (d) {
-                return selectedClusters.indexOf(d.cluster_label) > -1 ? "cluster-border active" : "cluster-border";
+                if (selectedClusters.indexOf(d.cluster_label) > -1) {
+                    return "cluster-border selected";
+                }
+                else if (adjacentToSelectedClusters.indexOf(d.cluster_label) > -1) {
+                    return "cluster-border adjacent";
+                }
+                else {
+                    return "cluster-border";
+                }
             });
         var merged = clusterWrappers.merge(clusters);
         merged.select("svg")
@@ -1433,14 +1648,16 @@ transientTector.stats = function (directorEvents) {
         var milliStamps = _.map(selectedTimestamps, function (t) {
             return t.getTime();
         });
-        selectedClusters = _.unique(_.map(
+        adjacentToSelectedClusters = _.unique(_.map(
             _.filter(data.clusterLabels, function (d) {
                 return milliStamps.indexOf(d.timestamp.getTime()) > -1;
             }),
             function (d) {
                 return +d.cluster_label;
             }));
-
+        if (adjacentToSelectedClusters.length == 0) {
+            selectedClusters = [];
+        }
         draw();
         return constructor;
     };
@@ -1556,11 +1773,40 @@ transientTector.director = function () {
     var selectedEigX;
     var selectedEigY;
 
+    function updateMergedLabels() {
+        components.reducedSpace.updateMergedLabels(data.mergedLabels);
+        components.timeSeries.updateMergedLabels(data.mergedLabels);
+        components.dashboardState.updateMergedLabels(data.mergedLabels);
+        drawLabelSelector();
+    }
+
+    function drawLabelSelector() {
+        var menuOptions = container.select("#metric-selector")
+            .select(".dropdown-menu");
+
+        menuOptions = menuOptions.selectAll(".dropdown-item")
+            .data(labelTypes);
+
+        menuOptions.enter()
+            .append("a")
+            .attr("href", "#")
+            .on("click", events.selectLabelType)
+            .merge(menuOptions)
+            .attr("class", function (d) {
+                return selectedLabelTypes.indexOf(d) > -1 ? "dropdown-item active" : "dropdown-item";
+            })
+            .text(function (d) {
+                return d.display;
+            });
+
+        menuOptions.exit().remove();
+    }
+
     function draw() {
-        container.on("contextmenu", function (d, i) {
+        /*container.on("contextmenu", function (d, i) {
             d3.event.preventDefault();
             events.selectTimestamps([]);
-        });
+        });*/
 
         container.select("#stats")
             .datum({
@@ -1600,25 +1846,7 @@ transientTector.director = function () {
             }).call(components.dashboardState.selectedLabelTypes(selectedLabelTypes));
         container.select("#note-download").call(components.noteDownload);
 
-        var menuOptions = container.select("#metric-selector")
-            .select(".dropdown-menu");
-
-        menuOptions = menuOptions.selectAll(".dropdown-item")
-            .data(labelTypes);
-
-        menuOptions.enter()
-            .append("a")
-            .attr("href", "#")
-            .on("click", events.selectLabelType)
-            .merge(menuOptions)
-            .attr("class", function (d) {
-                return selectedLabelTypes.indexOf(d) > -1 ? "dropdown-item active" : "dropdown-item";
-            })
-            .text(function (d) {
-                return d.display;
-            });
-
-        menuOptions.exit().remove();
+        drawLabelSelector();
     }
 
     function getMergedTransientLabels() {
@@ -1801,7 +2029,8 @@ transientTector.director = function () {
         }
         data.mergedLabels = getMergedTransientLabels();
 
-        draw();
+        updateMergedLabels();
+        //draw();
     };
     events.addNote = function () {
         var annotation = d3.select("#annotation");

@@ -27,6 +27,7 @@ h1,h2,h4,h5{
     background-color:white;
     border: 1px solid #FF9D8E;
     font-size:10px;
+    color:black;
 }
 
 .transient-label{
@@ -71,9 +72,13 @@ rect.cluster-border{
     fill:none;
 
 }
-rect.cluster-border.active{
+rect.cluster-border.selected{
     stroke:#86A322;
-    stroke-width: 2;
+    stroke-width: 3;
+}
+rect.cluster-border.adjacent{
+    stroke:#597203;
+    stroke-width: 1;
 }
 .data-color .fa-square{
     color: #0DA3CE;
@@ -107,4 +112,30 @@ rect.cluster-border.active{
 #tag-table{
     text-transform:capitalize;
     color:#6A6C6E;
+}
+
+text.label{
+    color:white;
+    fill:white;
+    stroke:white;
+    font-size:10px;
+}
+text.legendTitle{
+    color:white;
+    fill:white;
+    stroke:white;
+    font-size:14px;
+}
+.dashboard-options{
+    margin-bottom: 5px;
+}
+.dashboard-state-description{
+    margin-bottom: 10px;
+}
+
+path.domain{
+    stroke:white;
+}
+.tick line{
+    stroke:white;
 }
