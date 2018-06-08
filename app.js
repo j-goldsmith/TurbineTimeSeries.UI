@@ -1296,6 +1296,7 @@ transientTector.reducedSpace = function (directorEvents) {
                 .attr("transform", d3.zoomIdentity);
             container.select("svg.scatter")
                 .call(zoomer.transform, d3.zoomIdentity);
+            resetZoom=false;
         }
 
         if (!selectedAxes.x) {
