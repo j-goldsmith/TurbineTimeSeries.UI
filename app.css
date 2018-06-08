@@ -123,7 +123,7 @@ text.label{
 text.legendTitle{
     color:white;
     fill:white;
-    stroke:white;
+    stroke-width: 0;
     font-size:14px;
 }
 .dashboard-options{

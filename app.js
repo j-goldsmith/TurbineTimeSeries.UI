@@ -989,16 +989,19 @@ transientTector.reducedSpace = function (directorEvents) {
         x: d3.axisBottom(scales.xScale)
     };
     var zoomK = 1;
+    var lastZoomK = 1;
     var selectedTimestamps = [];
     var selectedLabelTypes = [];
     var selectedLabelData = [];
-    var selectedAxes = {}
+    var selectedAxes = {};
+    var circleData = [];
+    var hexBinData;
 
     var color = d3.scaleThreshold().domain([10, 20, 30, 40, 50, 60, 70, 80, 90]).range(transientTector.colors.blue);
     var selectedColor = d3.scaleThreshold().domain([10, 20, 30, 40, 50, 60, 70, 80, 90]).range(transientTector.colors.green);
     var transientColor = d3.scaleThreshold().domain([10, 20, 30, 40, 50, 60, 70, 80, 90]).range(transientTector.colors.orange);
 
-    var zoomer = d3.zoom().scaleExtent([.8, 10]).on("zoom", zoom);
+    var zoomer = d3.zoom().scaleExtent([.8, 15]).on("zoom", zoom);
     var resetZoom = false;
 
     function xAxisSelect(d) {
@@ -1022,12 +1025,16 @@ transientTector.reducedSpace = function (directorEvents) {
         var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (d) {
             return d.getTime()
         });
-        var selectedTime = _.map(selectedTimestamps, function (d) {
+        var selectedTime = _.sortBy(_.map(selectedTimestamps, function (d) {
             return d.getTime();
-        });
+        }));
 
-        var selected = _.intersection(selectedTime, binnedTimestamps).length;
-        var hasTransient = _.intersection(selectedLabelData, binnedTimestamps).length;
+        var selected = _.filter(binnedTimestamps, function (t) {
+            return _.indexOf(selectedTime, t, true) > -1;
+        }).length;
+        var hasTransient = _.filter(binnedTimestamps, function (t) {
+            return _.indexOf(selectedLabelData, t, true) > -1;
+        }).length;
         var html = "<div class='popover-header'>" + d.length + " data points</div>";
         html += "<table class='table table-sm'><tbody>";
         html += "<tr><td>" + selected + "</td><td>selected</td>";
@@ -1039,13 +1046,36 @@ transientTector.reducedSpace = function (directorEvents) {
 
     }
 
-    function drawHexBins() {
-        selectedLabelData = [];
+    function refreshCircleData() {
         if (data) {
-            selectedLabelData = _.map(data.mergedLabels, function (c) {
+            selectedLabelData = _.sortBy(_.map(data.mergedLabels, function (c) {
                 return c.timestamp.getTime();
-            });
+            }));
         }
+        var selectedTime = _.map(selectedTimestamps, function (d) {
+            return d.getTime();
+        });
+
+        circleData = _.map(hexBinData, function (d) {
+            var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (t) {
+                return t.getTime()
+            });
+
+
+            d.isSelected = _.find(binnedTimestamps, function (t) {
+                return _.indexOf(selectedTime, t, true) > -1;
+            }) ? true : false;
+            d.hasTransient = _.find(binnedTimestamps, function (t) {
+                return _.indexOf(selectedLabelData, t, true) > -1;
+            }) ? true : false;
+
+            return d;
+        });
+    }
+
+    function drawHexBins() {
+        //selectedLabelData = [];
+
 
         var hexbin = d3.hexbin()
             .x(function (d) {
@@ -1056,7 +1086,14 @@ transientTector.reducedSpace = function (directorEvents) {
             })
             .radius(8 / zoomK);
 
-        var hexBinData = hexbin(data.pca);
+        hexBinData = hexbin(data.pca);
+        if (zoomK !== lastZoomK) {
+            refreshCircleData();
+            lastZoomK = zoomK;
+        }
+        var selectedTime = _.map(selectedTimestamps, function (d) {
+            return d.getTime();
+        });
         var points = container
             .select("svg.scatter")
             .select("g.hex")
@@ -1094,29 +1131,36 @@ transientTector.reducedSpace = function (directorEvents) {
                 return "M" + d.x + "," + d.y + hexbin.hexagon();
             })
             .attr("fill", function (d) {
+                /*  var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (t) {
+                      return t.getTime()
+                  });
 
+                  var isSelected = _.find(binnedTimestamps, function (t) {
+                      return _.indexOf(selectedTime, t, true) > -1;
+                  }) ? true : false;
+                  var hasTransient = _.find(binnedTimestamps, function (t) {
+                      return _.indexOf(selectedLabelData, t, true) > -1;
+                  }) ? true : false;
+
+                  if (isSelected) {
+                      return selectedColor(d.length);
+                  }
+                  if (hasTransient) {
+                      return transientColor(d.length);
+                  }*/
                 return color(d.length);
 
             });
         points.exit().remove();
-        var circleData = _.filter(_.map(hexBinData, function (d) {
-            var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (d) {
-                return d.getTime()
-            });
-            var selectedTime = _.map(selectedTimestamps, function (d) {
-                return d.getTime();
-            });
 
-            d.isSelected = _.intersection(selectedTime, binnedTimestamps).length > 0 ? true : false;
-            d.hasTransient = _.intersection(selectedLabelData, binnedTimestamps).length > 0 ? true : false;
 
-            return d;
-        }), function(d){return d.hasTransient || d.isSelected;});
         var selectedCircles = container
             .select("svg.scatter")
             .select("g.circles")
             .selectAll("circle.selected")
-            .data(circleData);
+            .data(_.filter(circleData, function (d) {
+                return d.isSelected;
+            }));
         selectedCircles.enter()
             .append('circle')
             .attr('class', 'selected')
@@ -1155,7 +1199,9 @@ transientTector.reducedSpace = function (directorEvents) {
             .select("svg.scatter")
             .select("g.circles")
             .selectAll("circle.transient")
-            .data(circleData);
+            .data(_.filter(circleData, function (d) {
+                return d.hasTransient;
+            }));
         transientCircles.enter()
             .append('circle')
             .attr('class', 'transient')
@@ -1180,14 +1226,13 @@ transientTector.reducedSpace = function (directorEvents) {
             })
             .attr("r", function (d) {
                 if (d.hasTransient) {
-                    return 3 / zoomK > .3 ? 3 / zoomK:.31;
+                    return 3 / zoomK > .3 ? 3 / zoomK : .31;
                 }
                 else {
                     return 0
                 }
             });
         transientCircles.exit().remove();
-
     }
 
     function drawAxes() {
@@ -1366,6 +1411,7 @@ transientTector.reducedSpace = function (directorEvents) {
             return selectedTimestamps;
         }
         selectedTimestamps = value;
+        refreshCircleData();
         draw();
         return constructor;
     };
@@ -1374,12 +1420,11 @@ transientTector.reducedSpace = function (directorEvents) {
             return selectedLabelTypes;
         }
         selectedLabelTypes = types;
-
-
         return constructor;
     };
     constructor.updateMergedLabels = function (value) {
         data.mergedLabels = value;
+        refreshCircleData();
         draw();
     };
     return constructor;
@@ -1986,7 +2031,7 @@ transientTector.director = function () {
         draw();
     }
     events.selectTimestamps = function (timestamps) {
-        selectedTimestamps = timestamps;
+        selectedTimestamps = _.sortBy(timestamps);
 
         components.reducedSpace.selectTimestamps(timestamps);
         components.timeSeries.selectTimestamps(timestamps);
