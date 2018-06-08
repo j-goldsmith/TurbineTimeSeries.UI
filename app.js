@@ -622,6 +622,7 @@ transientTector.timeSeries = function (directorEvents) {
         var labelDescription = "None";
         if (labelPoint) {
             labelDescription = "";
+            labelDescription += labelPoint.ensemble ? "Ensemble<br />" : "";
             labelDescription += labelPoint.kink ? "Kink Finder<br />" : "";
             labelDescription += labelPoint.powerStep ? "Power Jump<br />" : "";
             labelDescription += labelPoint.stepSize ? "Step Size<br />" : "";
@@ -1047,30 +1048,40 @@ transientTector.reducedSpace = function (directorEvents) {
     }
 
     function refreshCircleData() {
-        if (data) {
+        if(data && data.pca){
             selectedLabelData = _.sortBy(_.map(data.mergedLabels, function (c) {
                 return c.timestamp.getTime();
             }));
-        }
-        var selectedTime = _.map(selectedTimestamps, function (d) {
-            return d.getTime();
-        });
-
-        circleData = _.map(hexBinData, function (d) {
-            var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (t) {
-                return t.getTime()
+            var selectedTime = _.map(selectedTimestamps, function (d) {
+                return d.getTime();
             });
+            var hexbin = d3.hexbin()
+                .x(function (d) {
+                    return scales.xFull(d[selectedAxes.x.field]);
+                })
+                .y(function (d) {
+                    return scales.yFull(d[selectedAxes.y.field]);
+                })
+                .radius(8 / zoomK);
+
+            hexBinData = hexbin(data.pca);
+            circleData = _.map(hexBinData, function (d) {
+                var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (t) {
+                    return t.getTime()
+                });
 
 
-            d.isSelected = _.find(binnedTimestamps, function (t) {
-                return _.indexOf(selectedTime, t, true) > -1;
-            }) ? true : false;
-            d.hasTransient = _.find(binnedTimestamps, function (t) {
-                return _.indexOf(selectedLabelData, t, true) > -1;
-            }) ? true : false;
+                d.isSelected = _.find(binnedTimestamps, function (t) {
+                    return _.indexOf(selectedTime, t, true) > -1;
+                }) ? true : false;
+                d.hasTransient = _.find(binnedTimestamps, function (t) {
+                    return _.indexOf(selectedLabelData, t, true) > -1;
+                }) ? true : false;
 
-            return d;
-        });
+                return d;
+            });
+        }
+
     }
 
     function drawHexBins() {
@@ -1087,10 +1098,10 @@ transientTector.reducedSpace = function (directorEvents) {
             .radius(8 / zoomK);
 
         hexBinData = hexbin(data.pca);
-        if (zoomK !== lastZoomK) {
+        //if (zoomK !== lastZoomK) {
             refreshCircleData();
-            lastZoomK = zoomK;
-        }
+        //    lastZoomK = zoomK;
+        //}
         var selectedTime = _.map(selectedTimestamps, function (d) {
             return d.getTime();
         });
@@ -1226,7 +1237,7 @@ transientTector.reducedSpace = function (directorEvents) {
             })
             .attr("r", function (d) {
                 if (d.hasTransient) {
-                    return 3 / zoomK > .3 ? 3 / zoomK : .31;
+                    return 3 / zoomK;
                 }
                 else {
                     return 0
@@ -1273,13 +1284,14 @@ transientTector.reducedSpace = function (directorEvents) {
         var t = d3.event.transform;
         zoomK = t.k;
 
-        drawHexBins();
+
         container.select(".hex")
             .attr("transform", d3.event.transform);
         container.select(".circles")
             .attr("transform", d3.event.transform);
         scales.xScale.domain(t.rescaleX(scales.xFull).domain());
         scales.yScale.domain(t.rescaleY(scales.yFull).domain());
+        drawHexBins();
         drawAxes();
 
 
@@ -1411,7 +1423,7 @@ transientTector.reducedSpace = function (directorEvents) {
             return selectedTimestamps;
         }
         selectedTimestamps = value;
-        refreshCircleData();
+
         draw();
         return constructor;
     };
@@ -1424,7 +1436,6 @@ transientTector.reducedSpace = function (directorEvents) {
     };
     constructor.updateMergedLabels = function (value) {
         data.mergedLabels = value;
-        refreshCircleData();
         draw();
     };
     return constructor;
@@ -1769,6 +1780,10 @@ transientTector.director = function () {
     };
     var labelTypes = [
         {
+            display: "Ensemble",
+            dataKey: "ensembleLabels"
+        },
+        {
             display: "Kink Finder",
             dataKey: "kinkLabels"
         },
@@ -1821,10 +1836,10 @@ transientTector.director = function () {
     }
 
     function draw() {
-        /*container.on("contextmenu", function (d, i) {
+        container.on("contextmenu", function (d, i) {
             d3.event.preventDefault();
             events.selectTimestamps([]);
-        });*/
+        });
 
         container.select("#stats")
             .datum({
@@ -1848,6 +1863,7 @@ transientTector.director = function () {
             powerStepLabels: data.powerStepLabels,
             stepSizeLabels: data.stepSizeLabels,
             hdbscanLabels: data.hdbscanLabels,
+           // ensembleLabels: data.ensembleLabels,
             fields: data.fields,
             compositeFields: data.compositeFields,
             eigenvalues: data.eigenvalues
@@ -1898,19 +1914,29 @@ transientTector.director = function () {
             })
             : [];
 
-        var dates = _.union(kinkDates, powerDates, stepDates, hdbscanDates);
+        var ensembleDates = _.find(selectedLabelTypes, function (c) {
+            return c.dataKey === "ensembleLabels";
+        })
+            ? _.map(data.ensembleLabels, function (d) {
+                return d.timestamp.getTime();
+            })
+            : [];
+
+        var dates = _.union(kinkDates, powerDates, stepDates, hdbscanDates, ensembleDates);
         var timeParse = d3.timeParse("%Q");
         return _.map(dates, function (d) {
             var hasKink = _.contains(kinkDates, d) ? 1 : 0;
             var hasPower = _.contains(powerDates, d) ? 1 : 0;
             var hasStep = _.contains(stepDates, d) ? 1 : 0;
             var hasHdbscan = _.contains(hdbscanDates, d) ? 1 : 0;
+            var hasEnsemble = _.contains(ensembleDates, d) ? 1 : 0;
             return {
                 timestamp: timeParse(d),
                 kink: hasKink,
                 powerStep: hasPower,
                 stepSize: hasStep,
-                hdbscan: hasHdbscan
+                hdbscan: hasHdbscan,
+                ensemble: hasEnsemble
             }
         });
     }
@@ -1923,7 +1949,8 @@ transientTector.director = function () {
                            powerStepLabels,
                            stepSizeLabels,
                            clusterDistributions,
-                           hdbscan) {
+                           hdbscan,
+                           ensembleLabels) {
         data.raw = raw;
         data.pca = pca;
         data.kinkLabels = kinkLabels;
@@ -1932,6 +1959,8 @@ transientTector.director = function () {
         data.hdbscanLabels = hdbscan;
         data.powerStepLabels = powerStepLabels;
         data.stepSizeLabels = stepSizeLabels;
+        data.ensembleLabels = ensembleLabels;
+
 
         data.raw.forEach(function (d) {
             d.timestamp = transientTector.timeParse(d.timestamp);
@@ -1967,6 +1996,9 @@ transientTector.director = function () {
             d.timestamp = transientTector.timeParse(d.timestamp);
         });
         data.powerStepLabels.forEach(function (d) {
+            d.timestamp = transientTector.timeParse(d.timestamp);
+        });
+        data.ensembleLabels.forEach(function (d) {
             d.timestamp = transientTector.timeParse(d.timestamp);
         });
         data.clusterStats.forEach(function (d) {
@@ -2018,6 +2050,7 @@ transientTector.director = function () {
             .defer(d3.csv, "data/model2_pca_stepsize_psn" + psn + ".csv")
             .defer(d3.csv, "data/model2_20min_cluster_distributions_psn" + psn + ".csv")
             .defer(d3.csv, "data/model2_hdbscan_psn" + psn + ".csv")
+            .defer(d3.csv, "data/model2_ensemble_psn" + psn + ".csv")
             .await(updatePsnData);
 
         return psn;
