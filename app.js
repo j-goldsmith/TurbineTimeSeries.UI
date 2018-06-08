@@ -472,7 +472,7 @@ transientTector.timePlot = function (directorEvents, dataKey) {
         if (!arguments.length) {
             return dimensions;
         }
-        dimensions.width = value.width - 30;
+        dimensions.width = value.width;
         dimensions.height = value.height / 5;
 
         dimensions.titleHeight = dimensions.height * 0.2;
@@ -572,7 +572,13 @@ transientTector.timeSeries = function (directorEvents) {
         if (!rawPoint) {
             return;
         }
-        selectedTimestamps.push(rawPoint.timestamp);
+        var idx = _.map(selectedTimestamps,function(t){return t.getTime();}).indexOf(rawPoint.timestamp.getTime());
+        if(idx > -1){
+            selectedTimestamps.splice(idx,1)
+        }else{
+            selectedTimestamps.push(rawPoint.timestamp);
+        }
+
         directorEvents.selectTimestamps(selectedTimestamps);
     }
 
@@ -599,7 +605,7 @@ transientTector.timeSeries = function (directorEvents) {
     }
 
     function hover(d, i) {
-        var coord = d3.event.offsetX;
+        var coord = d3.event.offsetX-5;
         var hoveredDate = scales.xDisplayed.invert(coord);
 
         var rawPoint = _.first(_.sortBy(data.raw, function (d) {
@@ -917,7 +923,7 @@ transientTector.timeSeries = function (directorEvents) {
         if (!arguments.length) {
             return dimensions;
         }
-        dimensions.width = (value.width / 2);
+        dimensions.width = (value.width / 2) - 30;
         dimensions.height = value.height * 0.64;
         dimensions.parentWidth = value.width;
         dimensions.parentHeight = value.height;
