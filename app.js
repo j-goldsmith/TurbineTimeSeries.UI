@@ -997,7 +997,13 @@ transientTector.reducedSpace = function (directorEvents) {
     var selectedAxes = {};
     var circleData = [];
     var hexBinData;
-
+    var hexbin = d3.hexbin()
+        .x(function (d) {
+            return scales.xFull(d[selectedAxes.x.field]);
+        })
+        .y(function (d) {
+            return scales.yFull(d[selectedAxes.y.field]);
+        });
     var color = d3.scaleThreshold().domain([10, 20, 30, 40, 50, 60, 70, 80, 90]).range(transientTector.colors.blue);
     var selectedColor = d3.scaleThreshold().domain([10, 20, 30, 40, 50, 60, 70, 80, 90]).range(transientTector.colors.green);
     var transientColor = d3.scaleThreshold().domain([10, 20, 30, 40, 50, 60, 70, 80, 90]).range(transientTector.colors.orange);
@@ -1055,16 +1061,8 @@ transientTector.reducedSpace = function (directorEvents) {
             var selectedTime = _.map(selectedTimestamps, function (d) {
                 return d.getTime();
             });
-            var hexbin = d3.hexbin()
-                .x(function (d) {
-                    return scales.xFull(d[selectedAxes.x.field]);
-                })
-                .y(function (d) {
-                    return scales.yFull(d[selectedAxes.y.field]);
-                })
-                .radius(8 / zoomK);
-
-            hexBinData = hexbin(data.pca);
+            //hexbin.radius(8 / zoomK);
+            //hexBinData = hexbin(data.pca);
             circleData = _.map(hexBinData, function (d) {
                 var binnedTimestamps = _.map(_.pluck(d, "timestamp"), function (t) {
                     return t.getTime()
@@ -1072,7 +1070,7 @@ transientTector.reducedSpace = function (directorEvents) {
 
 
                 d.isSelected = _.find(binnedTimestamps, function (t) {
-                    return _.indexOf(selectedTime, t, true) > -1;
+                    return _.indexOf(selectedTime, t) > -1;
                 }) ? true : false;
                 d.hasTransient = _.find(binnedTimestamps, function (t) {
                     return _.indexOf(selectedLabelData, t, true) > -1;
@@ -1087,19 +1085,10 @@ transientTector.reducedSpace = function (directorEvents) {
     function drawHexBins() {
         //selectedLabelData = [];
 
-
-        var hexbin = d3.hexbin()
-            .x(function (d) {
-                return scales.xFull(d[selectedAxes.x.field]);
-            })
-            .y(function (d) {
-                return scales.yFull(d[selectedAxes.y.field]);
-            })
-            .radius(8 / zoomK);
-
+        hexbin.radius(8 / zoomK);
         hexBinData = hexbin(data.pca);
         //if (zoomK !== lastZoomK) {
-            refreshCircleData();
+        refreshCircleData();
         //    lastZoomK = zoomK;
         //}
         var selectedTime = _.map(selectedTimestamps, function (d) {
@@ -1384,8 +1373,10 @@ transientTector.reducedSpace = function (directorEvents) {
                     .scale(color).shapeWidth(25).title("Measurement Density")
             )
             .attr("transform", "translate(" + dimensions.width * .65 + "," + dimensions.height * .05 + ")");
-        drawAxes();
+
         drawHexBins();
+        drawAxes();
+
     }
 
     function constructor(selection) {
