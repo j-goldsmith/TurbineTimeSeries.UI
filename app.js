@@ -562,7 +562,7 @@ transientTector.timeSeries = function (directorEvents) {
     }
 
     function selectTimestamp() {
-        var coord = d3.event.offsetX;
+        var coord = d3.event.offsetX-5;
         var hoveredDate = scales.xDisplayed.invert(coord);
 
         var rawPoint = _.first(_.sortBy(data.raw, function (d) {
