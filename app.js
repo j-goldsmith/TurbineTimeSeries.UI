@@ -1608,7 +1608,7 @@ transientTector.stats = function (directorEvents) {
         });
         var sortable = [];
         for (var related in packageSimilarity) {
-            if (related === selectedPsn) {
+            if ((related === selectedPsn) || (related === "undefined")) {
                 continue;
             }
 
