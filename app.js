@@ -1020,12 +1020,14 @@ transientTector.reducedSpace = function (directorEvents) {
     function xAxisSelect(d) {
         selectedAxes.x = d;
         directorEvents.selectEigX(d);
+        setScales();
         draw();
     }
 
     function yAxisSelect(d) {
         selectedAxes.y = d;
         directorEvents.selectEigY(d);
+        setScales();
         draw();
     }
 
@@ -1292,31 +1294,16 @@ transientTector.reducedSpace = function (directorEvents) {
 
     }
 
-    function draw() {
-        var filteredData = data.pca;
-        if (!filteredData) {
-            return;
-        }
-        if (resetZoom) {
-            container.selectAll(".hex")
-                .attr("transform", d3.zoomIdentity);
-            container.select("svg.scatter")
-                .call(zoomer.transform, d3.zoomIdentity);
-            resetZoom=false;
-        }
-
+    function setScales(){
         if (!selectedAxes.x) {
             selectedAxes.x = data.compositeFields[0];
             selectedAxes.y = data.compositeFields[1];
         }
-        container.select("svg.scatter")
-            .attr("height", dimensions.height)
-            .attr("width", dimensions.width)
-            .call(zoomer);
-        var yExtent = d3.extent(_.map(_.pluck(filteredData, "pca_eig1"), function (d) {
+
+        var yExtent = d3.extent(_.map(_.pluck(data.pca,  selectedAxes.y.field), function (d) {
             return parseFloat(d);
         }));
-        var xExtent = d3.extent(_.map(_.pluck(filteredData, "pca_eig0"), function (d) {
+        var xExtent = d3.extent(_.map(_.pluck(data.pca,  selectedAxes.x.field), function (d) {
             return parseFloat(d);
         }));
 
@@ -1330,6 +1317,27 @@ transientTector.reducedSpace = function (directorEvents) {
 
         scales.yFull.domain(yExtent);
         scales.yFull.range([dimensions.height - 25, 25]);
+    }
+
+    function draw() {
+        var filteredData = data.pca;
+        if (!filteredData) {
+            return;
+        }
+        if (resetZoom) {
+            container.selectAll(".hex")
+                .attr("transform", d3.zoomIdentity);
+            container.select("svg.scatter")
+                .call(zoomer.transform, d3.zoomIdentity);
+            resetZoom=false;
+        }
+
+
+        container.select("svg.scatter")
+            .attr("height", dimensions.height)
+            .attr("width", dimensions.width)
+            .call(zoomer);
+
 
 
         var menuOptions = container.select(".x-selector")
@@ -1390,6 +1398,7 @@ transientTector.reducedSpace = function (directorEvents) {
         selection.each(function (d) {
             container = d3.select(this);
             data = d;
+            setScales();
             draw();
         });
     }
@@ -2040,15 +2049,15 @@ transientTector.director = function () {
         components.reducedSpace.psn(psn);
 
         d3.queue()
-            .defer(d3.csv, "data/model2_preprocessed_data_psn" + psn + ".csv")
-            .defer(d3.csv, "data/model2_pca_ncomponents5_psn" + psn + ".csv")
-            .defer(d3.csv, "data/model2_kinkfinder_psn" + psn + ".csv")
-            .defer(d3.csv, "data/model2_20min_kmeans_labels_psn" + psn + ".csv")
-            .defer(d3.csv, "data/model2_powerstepsize_psn" + psn + ".csv")
-            .defer(d3.csv, "data/model2_pca_stepsize_psn" + psn + ".csv")
-            .defer(d3.csv, "data/model2_20min_cluster_distributions_psn" + psn + ".csv")
-            .defer(d3.csv, "data/model2_hdbscan_psn" + psn + ".csv")
-            .defer(d3.csv, "data/model2_ensemble_psn" + psn + ".csv")
+            .defer(d3.csv, "data/pipeline_files/model2_preprocessed_data_psn" + psn + ".csv")
+            .defer(d3.csv, "data/pipeline_files/model2_pca_ncomponents5_psn" + psn + ".csv")
+            .defer(d3.csv, "data/pipeline_files/model2_20min_kinkfinder_psn" + psn + ".csv")
+            .defer(d3.csv, "data/pipeline_files/model2_20min_kmeans_labels_psn" + psn + ".csv")
+            .defer(d3.csv, "data/pipeline_files/model2_powerstepsize_psn" + psn + ".csv")
+            .defer(d3.csv, "data/pipeline_files/model2_stepsize_psn" + psn + ".csv")
+            .defer(d3.csv, "data/pipeline_files/model2_20min_cluster_distributions_psn" + psn + ".csv")
+            .defer(d3.csv, "data/pipeline_files/model2_hdbscan_psn" + psn + ".csv")
+            .defer(d3.csv, "data/pipeline_files/model2_ensemble_psn" + psn + ".csv")
             .await(updatePsnData);
 
         return psn;

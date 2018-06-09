@@ -245,13 +245,13 @@
 
     <script type="application/javascript">
         d3.queue()
-            .defer(d3.csv, "data/model2_psn.csv")
-            .defer(d3.csv, "data/model2_fields.csv")
-            .defer(d3.csv, "data/model2_composite_fields.csv")
-            .defer(d3.csv, "data/metrics.csv")
-            .defer(d3.csv, "data/model2_20min_partition_cluster_stats.csv")
-            .defer(d3.csv, "data/model2_20min_cluster_similarity.csv")
-            .defer(d3.csv, "data/model2_eigenvalues.csv")
+            .defer(d3.csv, "data/pipeline_files/model2_psn.csv")
+            .defer(d3.csv, "data/pipeline_files/model2_description.csv")
+            .defer(d3.csv, "data/manual_files/model2_composite_fields.csv")
+            .defer(d3.csv, "data/manual_files/metrics.csv")
+            .defer(d3.csv, "data/pipeline_files/model2_20min_partition_cluster_stats.csv")
+            .defer(d3.csv, "data/pipeline_files/model2_20min_cluster_package_similarity.csv")
+            .defer(d3.csv, "data/pipeline_files/model2_eigenvalues.csv")
             .await(init);
 
         function init(error, psn, fields,compositeFields, metrics, clusterStats,packageSimilarity, eigenvalues) {
